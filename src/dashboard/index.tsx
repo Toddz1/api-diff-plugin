@@ -776,6 +776,81 @@ const DiffResultModal: React.FC<DiffResultModalProps> = ({ originalRequest, newR
   );
 };
 
+// 添加会话重命名模态框组件
+interface RenameSessionModalProps {
+  session: CaptureSession;
+  onSave: (id: string, newName: string) => Promise<void>;
+  onClose: () => void;
+}
+
+const RenameSessionModal: React.FC<RenameSessionModalProps> = ({ session, onSave, onClose }) => {
+  const [name, setName] = useState(session.name || session.id);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      setError('名称不能为空');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      await onSave(session.id, name);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '重命名失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2>重命名会话</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="form-group">
+            <label>会话名称:</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="输入会话名称"
+            />
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+        </div>
+
+        <div className="modal-footer">
+          <div className="buttons">
+            <button 
+              className="cancel-button" 
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              取消
+            </button>
+            <button 
+              className="apply-button" 
+              onClick={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const [sessions, setSessions] = useState<CaptureSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
@@ -792,6 +867,9 @@ const Dashboard: React.FC = () => {
   // 批量选择状态
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
+
+  // 添加状态管理会话重命名
+  const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -1579,6 +1657,468 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // 添加处理会话重命名的函数
+  const handleRenameSession = async (sessionId: string, newName: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 查找会话
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) {
+        throw new Error('会话不存在');
+      }
+
+      // 更新会话
+      await storageManager.updateSession({
+        ...session,
+        name: newName
+      });
+
+      // 立即获取更新后的会话列表
+      const updatedSessions = await storageManager.getSessions();
+      setSessions(updatedSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+
+      // 如果当前选中的会话是被重命名的会话，也更新选中的会话数据
+      if (selectedSession === sessionId) {
+        const updatedSession = updatedSessions.find(s => s.id === sessionId);
+        if (updatedSession) {
+          setSelectedSessionData(updatedSession);
+        }
+      }
+
+      // 如果需要，还可以重新加载请求列表
+      await loadRequests();
+      
+      console.log(`Dashboard: Successfully renamed session ${sessionId} to "${newName}"`);
+    } catch (err) {
+      console.error('Dashboard: Failed to rename session:', err);
+      setError(`重命名会话失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 处理两个请求的对比
+  const handleCompareRequests = async () => {
+    if (selectedRequests.size !== 2) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 获取选中的两个请求
+      const requestIds = Array.from(selectedRequests);
+      const request1 = requests.find(r => r.id === requestIds[0]);
+      const request2 = requests.find(r => r.id === requestIds[1]);
+      
+      if (!request1 || !request2) {
+        throw new Error('无法找到选中的请求');
+      }
+
+      // 使用DiffResult类型定义差异数据
+      let diffData: DiffResult = {
+        requestDiff: {
+          url: request1.url !== request2.url ? { old: request1.url, new: request2.url } : undefined,
+          method: request1.method !== request2.method ? { old: request1.method, new: request2.method } : undefined,
+          headers: !deepEqual(request1.requestHeaders, request2.requestHeaders) ? 
+            { old: request1.requestHeaders, new: request2.requestHeaders } : undefined,
+          body: !deepEqual(request1.requestBody, request2.requestBody) ? 
+            { old: request1.requestBody, new: request2.requestBody } : undefined
+        },
+        responseDiff: {
+          status: request1.response?.status !== request2.response?.status ? 
+            { old: request1.response?.status || 0, new: request2.response?.status || 0 } : undefined,
+          headers: request1.responseHeaders !== request2.responseHeaders ? 
+            { old: request1.responseHeaders || {}, new: request2.responseHeaders || {} } : undefined,
+          body: !deepEqual(request1.response?.body, request2.response?.body) ? 
+            { old: request1.response?.body, new: request2.response?.body } : undefined
+        }
+      };
+
+      // 在新窗口中打开diff结果
+      const diffWindow = window.open('', '_blank', 'width=1200,height=800');
+      if (diffWindow) {
+        // 创建基本的HTML结构
+        diffWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>API 请求对比</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                margin: 0; 
+                padding: 20px;
+                font-size: 14px;
+                line-height: 1.5;
+                color: #333;
+              }
+              .diff-container { 
+                max-width: 100%; 
+                margin: 0 auto; 
+              }
+              .diff-header { 
+                padding: 15px 20px; 
+                background: #f5f5f5; 
+                border: 1px solid #ddd;
+                border-radius: 4px 4px 0 0;
+                margin-bottom: 20px;
+              }
+              .diff-title { 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                font-size: 20px;
+                font-weight: 600;
+              }
+              .diff-metadata {
+                display: flex;
+                justify-content: space-between;
+                font-size: 13px;
+                color: #555;
+              }
+              .diff-controls {
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                margin-top: 10px;
+                gap: 15px;
+              }
+              .diff-control-group {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+              }
+              .diff-control-label {
+                font-size: 13px;
+                font-weight: 500;
+                color: #555;
+              }
+              .diff-control-select {
+                padding: 4px 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+                font-size: 13px;
+              }
+              .diff-section { 
+                margin: 30px 0;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                overflow: hidden;
+              }
+              .diff-section-header {
+                padding: 12px 20px;
+                background: #f9f9f9;
+                border-bottom: 1px solid #ddd;
+                font-weight: 600;
+                font-size: 16px;
+                color: #333;
+              }
+              .diff-item { 
+                margin: 0; 
+                border-bottom: 1px solid #ddd;
+              }
+              .diff-item:last-child {
+                border-bottom: none;
+              }
+              .diff-item-header { 
+                padding: 10px 20px; 
+                background: #f9f9f9; 
+                border-bottom: 1px solid #ddd;
+                font-weight: 500;
+                font-size: 14px;
+              }
+              /* Customize diff2html styles */
+              .d2h-wrapper {
+                margin: 0;
+                padding: 0;
+              }
+              .d2h-file-header {
+                display: none;
+              }
+              .d2h-file-diff {
+                overflow-x: auto;
+                overflow-y: hidden;
+              }
+              .d2h-code-line {
+                white-space: pre;
+              }
+              .d2h-code-side-line {
+                padding: 0 0.5em;
+              }
+              
+              .return-button { 
+                display: block;
+                margin: 20px auto;
+                padding: 10px 20px; 
+                background: #4285f4; 
+                color: white; 
+                border: none; 
+                border-radius: 4px; 
+                cursor: pointer; 
+                font-size: 14px;
+              }
+              .return-button:hover { 
+                background: #3367d6; 
+              }
+            </style>
+          </head>
+          <body>
+            <div class="diff-container">
+              <div class="diff-header">
+                <h1 class="diff-title">API 请求对比</h1>
+                <div class="diff-metadata">
+                  <div>请求1: ${new Date(request1.timestamp).toLocaleString()}</div>
+                  <div>请求2: ${new Date(request2.timestamp).toLocaleString()}</div>
+                </div>
+                <div class="diff-controls">
+                  <div class="diff-control-group">
+                    <span class="diff-control-label">显示方式:</span>
+                    <select id="outputFormat" class="diff-control-select">
+                      <option value="side-by-side" selected>左右对比</option>
+                      <option value="line-by-line">行内对比</option>
+                    </select>
+                  </div>
+                  <div class="diff-control-group">
+                    <span class="diff-control-label">差异粒度:</span>
+                    <select id="diffStyle" class="diff-control-select">
+                      <option value="word" selected>单词</option>
+                      <option value="char">字符</option>
+                      <option value="none">行</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+        `);
+        
+        // 添加请求部分
+        diffWindow.document.write(`
+          <div class="diff-section">
+            <div class="diff-section-header">请求信息</div>
+        `);
+        
+        // URL对比
+        if (diffData.requestDiff.url) {
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">URL</div>
+              <div id="request-url" class="diff-content">
+                ${generateProfessionalDiff(
+                  diffData.requestDiff.url.old, 
+                  diffData.requestDiff.url.new,
+                  'url.txt'
+                )}
+              </div>
+            </div>
+          `);
+        }
+        
+        // Method对比
+        if (diffData.requestDiff.method) {
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">Method</div>
+              <div id="request-method" class="diff-content">
+                ${generateProfessionalDiff(
+                  diffData.requestDiff.method.old, 
+                  diffData.requestDiff.method.new,
+                  'method.txt'
+                )}
+              </div>
+            </div>
+          `);
+        }
+        
+        // Headers对比
+        if (diffData.requestDiff.headers) {
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">Request Headers</div>
+              <div id="request-headers" class="diff-content">
+                ${generateProfessionalDiff(
+                  JSON.stringify(diffData.requestDiff.headers.old, null, 2), 
+                  JSON.stringify(diffData.requestDiff.headers.new, null, 2),
+                  'request-headers.json'
+                )}
+              </div>
+            </div>
+          `);
+        }
+        
+        // Body对比
+        if (diffData.requestDiff.body) {
+          const oldBody = typeof diffData.requestDiff.body.old === 'string' 
+            ? diffData.requestDiff.body.old 
+            : JSON.stringify(diffData.requestDiff.body.old, null, 2);
+          const newBody = typeof diffData.requestDiff.body.new === 'string'
+            ? diffData.requestDiff.body.new
+            : JSON.stringify(diffData.requestDiff.body.new, null, 2);
+            
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">Request Body</div>
+              <div id="request-body" class="diff-content">
+                ${generateProfessionalDiff(oldBody, newBody, 'request-body.txt')}
+              </div>
+            </div>
+          `);
+        }
+        
+        diffWindow.document.write(`</div>`); // 结束请求部分
+        
+        // 添加响应部分
+        diffWindow.document.write(`
+          <div class="diff-section">
+            <div class="diff-section-header">响应信息</div>
+        `);
+        
+        // Status对比
+        if (diffData.responseDiff.status) {
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">Status</div>
+              <div id="response-status" class="diff-content">
+                ${generateProfessionalDiff(
+                  String(diffData.responseDiff.status.old), 
+                  String(diffData.responseDiff.status.new),
+                  'status.txt'
+                )}
+              </div>
+            </div>
+          `);
+        }
+        
+        // Headers对比
+        if (diffData.responseDiff.headers) {
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">Response Headers</div>
+              <div id="response-headers" class="diff-content">
+                ${generateProfessionalDiff(
+                  JSON.stringify(diffData.responseDiff.headers.old, null, 2), 
+                  JSON.stringify(diffData.responseDiff.headers.new, null, 2),
+                  'response-headers.json'
+                )}
+              </div>
+            </div>
+          `);
+        }
+        
+        // Response Body对比
+        if (diffData.responseDiff.body) {
+          const oldBody = typeof diffData.responseDiff.body.old === 'string' 
+            ? diffData.responseDiff.body.old 
+            : JSON.stringify(diffData.responseDiff.body.old, null, 2);
+          const newBody = typeof diffData.responseDiff.body.new === 'string'
+            ? diffData.responseDiff.body.new
+            : JSON.stringify(diffData.responseDiff.body.new, null, 2);
+            
+          diffWindow.document.write(`
+            <div class="diff-item">
+              <div class="diff-item-header">Response Body</div>
+              <div id="response-body" class="diff-content">
+                ${generateProfessionalDiff(oldBody, newBody, 'response-body.txt')}
+              </div>
+            </div>
+          `);
+        }
+        
+        // 添加JavaScript代码来处理样式切换
+        diffWindow.document.write(`
+            </div><!-- 结束响应部分 -->
+            <button class="return-button" onclick="window.close()">关闭窗口</button>
+          </div><!-- 结束diff-container -->
+          
+          <script>
+            // 处理样式变更
+            function handleStyleChange() {
+              const outputFormat = document.getElementById('outputFormat').value;
+              const diffStyle = document.getElementById('diffStyle').value;
+              
+              // 加载必要的库
+              if (!window.Diff || !window.Diff2Html) {
+                // 加载Diff库
+                const diffScript = document.createElement('script');
+                diffScript.src = 'https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js';
+                document.head.appendChild(diffScript);
+                
+                // 加载Diff2Html库
+                const diff2htmlScript = document.createElement('script');
+                diff2htmlScript.src = 'https://cdn.jsdelivr.net/npm/diff2html@3.4.35/bundles/js/diff2html.min.js';
+                document.head.appendChild(diff2htmlScript);
+                
+                // 库加载完成后重新生成diff
+                diff2htmlScript.onload = function() {
+                  regenerateAllDiffs();
+                };
+              } else {
+                // 如果库已加载，直接重新生成diff
+                regenerateAllDiffs();
+              }
+              
+              // 重新生成所有差异内容
+              function regenerateAllDiffs() {
+                // 获取所有差异容器
+                const diffContainers = [
+                  "request-url", "request-method", "request-headers", "request-body",
+                  "response-status", "response-headers", "response-body"
+                ];
+                
+                // 对每个存在的容器重新生成差异
+                diffContainers.forEach(id => {
+                  const container = document.getElementById(id);
+                  if (container) {
+                    // 获取原始内容（通过自定义属性或从DOM中解析）
+                    // 简单处理：重新加载页面以应用新样式
+                    window.location.reload();
+                  }
+                });
+              }
+            }
+            
+            // 绑定事件监听器
+            document.getElementById('outputFormat').addEventListener('change', handleStyleChange);
+            document.getElementById('diffStyle').addEventListener('change', handleStyleChange);
+          </script>
+        </body>
+        </html>
+        `);
+        
+        diffWindow.document.close();
+      } else {
+        // 如果新窗口打开失败，使用alert提示
+        console.error('Failed to open diff window, popup might be blocked');
+        alert('无法打开比较窗口，请检查您的浏览器是否阻止了弹出窗口。');
+      }
+    } catch (error) {
+      console.error('Failed to compare requests:', error);
+      setError(`比较请求失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 深度比较两个对象是否相等的辅助函数
+  const deepEqual = (a: any, b: any): boolean => {
+    if (a === b) return true;
+    if (a === null || b === null) return false;
+    if (a === undefined || b === undefined) return false;
+    if (typeof a !== typeof b) return false;
+    
+    if (typeof a === 'object') {
+      const keysA = Object.keys(a || {});
+      const keysB = Object.keys(b || {});
+      
+      if (keysA.length !== keysB.length) return false;
+      
+      return keysA.every(key => deepEqual(a[key], b[key]));
+    }
+    
+    return false;
+  };
+
   if (isLoading && !selectedSession) {
     return (
       <div className="dashboard loading">
@@ -1717,7 +2257,7 @@ const Dashboard: React.FC = () => {
                     }}
                   >
                     <div className="session-header">
-                      <span className="session-id">{session.id}</span>
+                      <span className="session-id">{session.name || session.id}</span>
                       <span className={`session-status ${session.status}`}>
                         {session.status}
                       </span>
@@ -1731,16 +2271,28 @@ const Dashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <button 
-                    className="delete-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteSession(session.id);
-                    }}
-                    title="删除会话"
-                  >
-                    ×
-                  </button>
+                  <div className="session-actions">
+                    <button 
+                      className="rename-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRenameSessionId(session.id);
+                      }}
+                      title="重命名会话"
+                    >
+                      ✏️
+                    </button>
+                    <button 
+                      className="delete-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(session.id);
+                      }}
+                      title="删除会话"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -1763,13 +2315,25 @@ const Dashboard: React.FC = () => {
                       全选
                     </label>
                     {selectedRequests.size > 0 && (
-                      <button 
-                        className="delete-selected"
-                        onClick={handleDeleteSelectedRequests}
-                        disabled={isLoading}
-                      >
-                        删除选中 ({selectedRequests.size})
-                      </button>
+                      <>
+                        <button 
+                          className="delete-selected"
+                          onClick={handleDeleteSelectedRequests}
+                          disabled={isLoading}
+                        >
+                          删除选中 ({selectedRequests.size})
+                        </button>
+                        
+                        {selectedRequests.size === 2 && (
+                          <button 
+                            className="compare-selected"
+                            onClick={handleCompareRequests}
+                            disabled={isLoading}
+                          >
+                            请求对比
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1839,6 +2403,15 @@ const Dashboard: React.FC = () => {
           )}
         </main>
       </div>
+      
+      {/* 添加重命名模态框 */}
+      {renameSessionId && (
+        <RenameSessionModal 
+          session={sessions.find(s => s.id === renameSessionId)!}
+          onSave={handleRenameSession}
+          onClose={() => setRenameSessionId(null)}
+        />
+      )}
     </div>
   );
 };

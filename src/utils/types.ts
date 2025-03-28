@@ -21,6 +21,7 @@ export interface CaptureSession {
   timestamp: number;
   status: 'capturing' | 'completed';
   requestCount: number;
+  name?: string;
 }
 
 export interface PaginationOptions {

@@ -189,6 +189,31 @@ body {
   cursor: pointer;
 }
 
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rename-button {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.rename-button:hover {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
 .delete-button {
   background: none;
   border: none;
@@ -1164,4 +1189,27 @@ body {
   font-family: monospace;
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* 样式比较按钮 */
+.compare-selected {
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: 8px;
+}
+
+.compare-selected:hover {
+  background-color: #3367d6;
+}
+
+.compare-selected:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 } 
