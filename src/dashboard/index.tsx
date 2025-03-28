@@ -21,10 +21,11 @@ const DEFAULT_PAGINATION: PaginationOptions = {
 };
 
 const DEFAULT_DISPLAY_OPTIONS = {
-  requestHeaders: false,
-  requestBody: false,
-  responseHeaders: false,
-  responseBody: true
+  requestHeaders: true,
+  requestBody: true,
+  responseHeaders: true,
+  responseBody: true,
+  duration: true // 默认显示耗时
 };
 
 // 复制到剪贴板函数
@@ -237,14 +238,14 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="diff-modal">
+    <div className="modal">
+      <div className="modal-content">
         <div className="modal-header">
-          <h2>Compare and Modify Request</h2>
+          <h2>比较和修改请求</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         
-        <div className="modal-content">
+        <div className="modal-body">
           <div className="form-group">
             <label>Method:</label>
             <select 
@@ -304,14 +305,14 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
                 checked={shouldResend}
                 onChange={e => setShouldResend(e.target.checked)}
               />
-              Resend request with modifications
+              使用修改后的内容重新发送请求
             </label>
           </div>
 
           {error && <div className="error-message">{error}</div>}
 
           <div className="diff-preview">
-            <h3>Changes Preview</h3>
+            <h3>变更预览</h3>
             <div className="diff-section">
               {Object.entries(modifiedRequest).map(([key, value]) => {
                 const originalValue = request[key as keyof RequestData];
@@ -321,11 +322,11 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
                       <h4>{key}</h4>
                       <div className="diff-content">
                         <div className="original">
-                          <strong>Original:</strong>
+                          <strong>原始值:</strong>
                           <pre>{JSON.stringify(originalValue, null, 2)}</pre>
                         </div>
                         <div className="modified">
-                          <strong>Modified:</strong>
+                          <strong>修改后:</strong>
                           <pre>{JSON.stringify(value, null, 2)}</pre>
                         </div>
                       </div>
@@ -344,15 +345,109 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
             onClick={onClose}
             disabled={isLoading}
           >
-            Cancel
+            取消
           </button>
           <button 
             className="apply-button" 
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? 'Processing...' : 'Apply Changes'}
+            {isLoading ? '处理中...' : '应用修改'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 添加一个新的完整信息模态窗口组件
+interface SourceModalProps {
+  request: RequestData;
+  onClose: () => void;
+}
+
+const SourceModal: React.FC<SourceModalProps> = ({ request, onClose }) => {
+  return (
+    <div className="modal">
+      <div className="modal-content large-modal">
+        <div className="modal-header">
+          <h2>完整请求/响应信息</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="source-section">
+            <h3>请求信息</h3>
+            <div className="source-item">
+              <div className="source-label">URL:</div>
+              <div className="source-value">{request.url}</div>
+            </div>
+            <div className="source-item">
+              <div className="source-label">Method:</div>
+              <div className="source-value">{request.method}</div>
+            </div>
+            <div className="source-item">
+              <div className="source-label">Timestamp:</div>
+              <div className="source-value">{new Date(request.timestamp).toLocaleString()}</div>
+            </div>
+            {request.duration && (
+              <div className="source-item">
+                <div className="source-label">Duration:</div>
+                <div className="source-value">{request.duration}ms</div>
+              </div>
+            )}
+            <div className="source-item">
+              <div className="source-label">Request Headers:</div>
+              <div className="source-value code-block">
+                <pre>{JSON.stringify(request.requestHeaders, null, 2)}</pre>
+              </div>
+            </div>
+            {request.requestBody && (
+              <div className="source-item">
+                <div className="source-label">Request Body:</div>
+                <div className="source-value code-block">
+                  <pre>
+                    {typeof request.requestBody === 'string'
+                      ? request.requestBody
+                      : JSON.stringify(request.requestBody, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="source-section">
+            <h3>响应信息</h3>
+            {request.response ? (
+              <>
+                <div className="source-item">
+                  <div className="source-label">Status:</div>
+                  <div className="source-value">
+                    {request.response.status} {request.response.statusText}
+                  </div>
+                </div>
+                {request.responseHeaders && (
+                  <div className="source-item">
+                    <div className="source-label">Response Headers:</div>
+                    <div className="source-value code-block">
+                      <pre>{JSON.stringify(request.responseHeaders, null, 2)}</pre>
+                    </div>
+                  </div>
+                )}
+                <div className="source-item">
+                  <div className="source-label">Response Body:</div>
+                  <div className="source-value code-block">
+                    <pre>
+                      {typeof request.response.body === 'string'
+                        ? request.response.body
+                        : JSON.stringify(request.response.body, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="no-response">No response data available</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -375,6 +470,12 @@ const RequestItem: React.FC<{
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDiffModal, setShowDiffModal] = useState(false);
+  const [showSourceModal, setShowSourceModal] = useState(false);
+
+  // 获取状态码，如果有的话
+  const statusCode = request.response?.status || '';
+  // 请求耗时
+  const duration = request.duration;
 
   return (
     <div className="request-item">
@@ -394,22 +495,37 @@ const RequestItem: React.FC<{
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <span className={`method ${request.method.toLowerCase()}`}>
-            {request.method}
+            {request.method}{statusCode && <span className="status-code">{` ${statusCode}`}</span>}
           </span>
           <span className="url" title={request.url}>
             {request.url}
           </span>
+          {displayOptions.duration && duration !== undefined && (
+            <span className="duration">{duration}ms</span>
+          )}
         </div>
-        <button 
-          className="diff-button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDiffModal(true);
-          }}
-          title="Compare and modify request"
-        >
-          Diff
-        </button>
+        <div className="request-actions">
+          <button 
+            className="source-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSourceModal(true);
+            }}
+            title="查看完整请求/响应信息"
+          >
+            Source
+          </button>
+          <button 
+            className="diff-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDiffModal(true);
+            }}
+            title="比较和修改请求"
+          >
+            Diff
+          </button>
+        </div>
       </div>
       
       <div className="request-info">
@@ -446,7 +562,7 @@ const RequestItem: React.FC<{
           {request.response && displayOptions.responseBody && (
             <CollapsibleSection 
               title="Response Body" 
-              content={request.response} 
+              content={request.response.body} 
             />
           )}
         </div>
@@ -457,6 +573,13 @@ const RequestItem: React.FC<{
           request={request}
           onClose={() => setShowDiffModal(false)}
           onSendRequest={onSendModifiedRequest || (async () => {})}
+        />
+      )}
+      
+      {showSourceModal && (
+        <SourceModal
+          request={request}
+          onClose={() => setShowSourceModal(false)}
         />
       )}
     </div>

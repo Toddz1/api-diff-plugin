@@ -7,6 +7,8 @@ export interface RequestData {
   requestBody?: any;
   responseHeaders?: Record<string, string>;
   response?: any;
+  duration?: number;
+  selected?: boolean;
 }
 
 export interface ModifiedRequestData extends Partial<RequestData> {

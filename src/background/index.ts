@@ -373,6 +373,9 @@ chrome.webRequest.onCompleted.addListener(
       if (completionTime > 10000) { // 10秒以上的请求
         request.timestamp = Date.now();
       }
+      
+      // 记录请求耗时
+      request.duration = completionTime;
 
       // 检查是否为Diff请求
       const isDiffRequest = request.requestHeaders && 
@@ -410,14 +413,15 @@ chrome.webRequest.onCompleted.addListener(
         // 处理响应体
         if (contentType && contentType.includes('application/json')) {
           try {
-            // 尝试解析JSON
-            request.response.body = JSON.parse(responseText);
+            // 尝试解析JSON，只保存body部分
+            const jsonBody = JSON.parse(responseText);
+            request.response.body = jsonBody;
           } catch (e) {
             // 如果解析失败，保存文本
             request.response.body = responseText;
           }
         } else {
-          // 非JSON响应直接保存文本
+          // 非JSON响应直接保存文本作为body
           request.response.body = responseText;
         }
         

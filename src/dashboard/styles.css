@@ -365,6 +365,103 @@ body {
   flex: 1;
 }
 
+.method .status-code {
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+.duration {
+  font-size: 0.75rem;
+  color: #666;
+  background-color: #f5f5f5;
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+  margin-left: auto;
+  font-family: monospace;
+}
+
+.request-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* 统一按钮样式 */
+.source-button,
+.diff-button {
+  padding: 4px 8px;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.source-button:hover,
+.diff-button:hover {
+  background-color: #1976d2;
+  color: white;
+}
+
+.source-section {
+  margin-bottom: 2rem;
+}
+
+.source-section h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+}
+
+.source-item {
+  margin-bottom: 1rem;
+}
+
+.source-label {
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+  color: #555;
+}
+
+.source-value {
+  font-family: monospace;
+  background-color: #f5f5f5;
+  padding: 0.5rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.code-block {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.code-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.large-modal .modal-content {
+  width: 80%;
+  max-width: 1200px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.no-response {
+  color: #999;
+  font-style: italic;
+  padding: 1rem;
+  text-align: center;
+  border: 1px dashed #e0e0e0;
+  border-radius: 4px;
+}
+
 .request-header:hover {
   background-color: #f5f5f5;
 }
@@ -673,25 +770,8 @@ body {
   font-size: 0.75rem;
 }
 
-/* Diff Button Styles */
-.diff-button {
-  padding: 4px 8px;
-  background-color: #e3f2fd;
-  color: #1976d2;
-  border: 1px solid #1976d2;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.diff-button:hover {
-  background-color: #1976d2;
-  color: white;
-}
-
-/* Modal Styles */
-.modal-overlay {
+/* 统一Modal样式 */
+.modal {
   position: fixed;
   top: 0;
   left: 0;
@@ -704,7 +784,7 @@ body {
   z-index: 1000;
 }
 
-.diff-modal {
+.modal-content {
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -713,6 +793,14 @@ body {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
+  padding: 0;  /* 移除内边距 */
+  overflow: hidden;  /* 防止内容溢出 */
+}
+
+.modal-body {
+  padding: 1rem;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-header {
@@ -741,12 +829,6 @@ body {
 
 .close-button:hover {
   color: #333;
-}
-
-.modal-content {
-  padding: 1rem;
-  overflow-y: auto;
-  flex: 1;
 }
 
 .form-group {
