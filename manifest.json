@@ -13,11 +13,11 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background/index.js",
+    "service_worker": "background.js",
     "type": "module"
   },
   "action": {
-    "default_popup": "popup/index.html",
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -27,12 +27,20 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/index.js"]
+      "js": ["content.js"]
     }
   ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [{
+    "resources": [
+      "dashboard.html",
+      "dashboard.js",
+      "icons/*"
+    ],
+    "matches": ["<all_urls>"]
+  }]
 } 

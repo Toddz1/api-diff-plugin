@@ -1,14 +1,14 @@
-import { RequestData, StorageData } from '../utils/types';
+import { RequestData } from '../utils/types';
+import { StorageManager } from '../utils/storage';
 
-// 存储捕获的请求
-let capturedRequests: RequestData[] = [];
+const storageManager = StorageManager.getInstance();
 let isCapturing = false;
 
-// 初始化时从存储中恢复状态
-chrome.storage.local.get(['isCapturing'], (result) => {
-  if (result.isCapturing !== undefined) {
-    isCapturing = result.isCapturing;
-  }
+// 初始化
+chrome.runtime.onInstalled.addListener(() => {
+  storageManager.initialize().catch(error => {
+    console.error('Failed to initialize storage:', error);
+  });
 });
 
 // 监听网络请求
@@ -27,12 +27,13 @@ chrome.webRequest.onBeforeRequest.addListener(
             bytes: data.bytes || new ArrayBuffer(0)
           }))
         } : undefined,
-        headers: {},
+        requestHeaders: {},
         response: null
       };
       
-      capturedRequests.push(requestData);
-      saveToStorage();
+      storageManager.saveRequest(requestData).catch(error => {
+        console.error('Failed to save request:', error);
+      });
     }
   },
   { urls: ["<all_urls>"] },
@@ -42,18 +43,31 @@ chrome.webRequest.onBeforeRequest.addListener(
 // 监听请求头
 chrome.webRequest.onSendHeaders.addListener(
   (details) => {
-    const request = capturedRequests.find(r => r.id === details.requestId);
-    if (request) {
-      // 将 HttpHeader[] 转换为 Record<string, string>
-      const headers: Record<string, string> = {};
-      details.requestHeaders?.forEach(header => {
-        if (header.name && header.value) {
-          headers[header.name] = header.value;
-        }
-      });
-      request.headers = headers;
-      saveToStorage();
-    }
+    if (!isCapturing) return;
+    
+    // 将 HttpHeader[] 转换为 Record<string, string>
+    const headers: Record<string, string> = {};
+    details.requestHeaders?.forEach(header => {
+      if (header.name && header.value) {
+        headers[header.name] = header.value;
+      }
+    });
+
+    storageManager.getSessions().then(sessions => {
+      const currentSession = sessions.find(s => s.status === 'capturing');
+      if (currentSession) {
+        return storageManager.getSessionRequests(currentSession.id);
+      }
+      return [];
+    }).then(requests => {
+      const request = requests.find(r => r.id === details.requestId);
+      if (request) {
+        request.requestHeaders = headers;
+        return storageManager.saveRequest(request);
+      }
+    }).catch(error => {
+      console.error('Failed to update request headers:', error);
+    });
   },
   { urls: ["<all_urls>"] },
   ["requestHeaders"]
@@ -61,34 +75,46 @@ chrome.webRequest.onSendHeaders.addListener(
 
 // 监听响应
 chrome.webRequest.onCompleted.addListener(
-  async (details) => {
-    const request = capturedRequests.find(r => r.id === details.requestId);
-    if (request) {
-      try {
-        const response = await fetch(request.url, {
-          method: request.method,
-          headers: request.headers,
-          body: request.requestBody?.raw?.[0]?.bytes
-        });
-        const responseData = await response.json();
-        request.response = responseData;
-        saveToStorage();
-      } catch (error) {
-        console.error('Failed to capture response:', error);
+  (details) => {
+    if (!isCapturing) return;
+
+    storageManager.getSessions().then(sessions => {
+      const currentSession = sessions.find(s => s.status === 'capturing');
+      if (currentSession) {
+        return storageManager.getSessionRequests(currentSession.id);
       }
-    }
+      return [];
+    }).then(async requests => {
+      const request = requests.find(r => r.id === details.requestId);
+      if (request) {
+        try {
+          const response = await fetch(request.url, {
+            method: request.method,
+            headers: request.requestHeaders,
+            body: request.requestBody?.raw?.[0]?.bytes
+          });
+          
+          // 保存响应头
+          const responseHeaders: Record<string, string> = {};
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+          request.responseHeaders = responseHeaders;
+          
+          // 保存响应体
+          request.response = await response.json();
+          
+          await storageManager.saveRequest(request);
+        } catch (error) {
+          console.error('Failed to capture response:', error);
+        }
+      }
+    }).catch(error => {
+      console.error('Failed to update request with response:', error);
+    });
   },
   { urls: ["<all_urls>"] }
 );
-
-// 保存到 Chrome 存储
-function saveToStorage() {
-  const storageData: StorageData = {
-    requests: capturedRequests,
-    groups: []
-  };
-  chrome.storage.local.set({ apiDiffData: storageData });
-}
 
 // 监听来自 popup 的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -99,29 +125,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ isCapturing });
       break;
     
-    case 'GET_CAPTURED_REQUESTS':
-      sendResponse({ requests: capturedRequests });
-      break;
-    
     case 'START_CAPTURE':
-      isCapturing = true;
-      capturedRequests = []; // 清空之前的请求
-      chrome.storage.local.set({ isCapturing: true }); // 保存状态
-      sendResponse({ success: true });
+      storageManager.createSession().then(() => {
+        isCapturing = true;
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Failed to start capture:', error);
+        sendResponse({ success: false, error: error.message });
+      });
       break;
     
     case 'STOP_CAPTURE':
-      isCapturing = false;
-      saveToStorage(); // 保存最终结果
-      chrome.storage.local.set({ isCapturing: false }); // 保存状态
-      sendResponse({ success: true });
+      storageManager.endCurrentSession().then(() => {
+        isCapturing = false;
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Failed to stop capture:', error);
+        sendResponse({ success: false, error: error.message });
+      });
       break;
     
     default:
       sendResponse({ error: 'Unknown message type' });
   }
   
-  return true; // 保持消息通道开放
+  return true;
 });
 
 console.log('Background script loaded'); 

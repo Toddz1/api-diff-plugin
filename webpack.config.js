@@ -13,7 +13,8 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: '[name]/index.js',
+    filename: '[name].js',
+    publicPath: '',
   },
   module: {
     rules: [
@@ -38,12 +39,12 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: './src/popup/index.html',
-      filename: 'popup/index.html',
+      filename: 'popup.html',
       chunks: ['popup'],
     }),
     new HtmlWebpackPlugin({
       template: './src/dashboard/index.html',
-      filename: 'dashboard/index.html',
+      filename: 'dashboard.html',
       chunks: ['dashboard'],
     }),
     new CopyPlugin({
@@ -54,4 +55,4 @@ module.exports = {
       ],
     }),
   ],
-}; 
+};

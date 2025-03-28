@@ -4,13 +4,46 @@ export interface RequestData {
   method: string;
   timestamp: number;
   requestBody?: {
-    raw?: Array<{
-      bytes: ArrayBuffer;
-    }>;
+    raw?: { bytes: ArrayBuffer }[];
   };
-  headers: Record<string, string>;
+  requestHeaders: Record<string, string>;
+  responseHeaders?: Record<string, string>;
   response: any;
   groupId?: string;
+}
+
+export interface CaptureSession {
+  id: string;           // 格式：YYYYMMDD_HH_mm_ss_SSS
+  timestamp: number;    // 创建时间戳
+  requestCount: number; // 请求数量
+  status: 'capturing' | 'completed'; // 会话状态
+}
+
+export interface PaginationOptions {
+  page: number;
+  pageSize: number;
+}
+
+export interface SearchOptions {
+  query: string;
+  fields: {
+    url: boolean;
+    requestHeaders: boolean;
+    requestBody: boolean;
+    responseHeaders: boolean;
+    responseBody: boolean;
+  };
+}
+
+export interface StorageData {
+  requests: RequestData[];
+  groups: Group[];
+  sessions: CaptureSession[];
+  currentSession: string | null;
+  settings: {
+    pagination: PaginationOptions;
+    search: SearchOptions;
+  };
 }
 
 export interface Group {
@@ -18,28 +51,19 @@ export interface Group {
   name: string;
   description?: string;
   createdAt: number;
-}
-
-export interface StorageData {
-  requests: RequestData[];
-  groups: Group[];
+  updatedAt: number;
 }
 
 export interface DiffResult {
   requestDiff: {
-    url?: { before: string; after: string };
-    method?: { before: string; after: string };
-    headers?: { before: Record<string, string>; after: Record<string, string> };
-    body?: { before: any; after: any };
+    url?: { old: string; new: string };
+    method?: { old: string; new: string };
+    headers?: { old: Record<string, string>; new: Record<string, string> };
+    body?: { old: any; new: any };
   };
   responseDiff: {
-    before: any;
-    after: any;
-    differences: Array<{
-      path: string;
-      type: 'type_mismatch' | 'value_mismatch';
-      before: any;
-      after: any;
-    }>;
+    status?: { old: number; new: number };
+    headers?: { old: Record<string, string>; new: Record<string, string> };
+    body?: { old: any; new: any };
   };
 } 

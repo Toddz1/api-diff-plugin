@@ -29,7 +29,9 @@ const Popup: React.FC = () => {
   };
 
   const handleOpenDashboard = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') });
+    const url = chrome.runtime.getURL('dashboard.html');
+    console.log('Opening dashboard at:', url);
+    chrome.tabs.create({ url });
   };
 
   const containerStyle: React.CSSProperties = {

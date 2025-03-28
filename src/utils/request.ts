@@ -1,17 +1,61 @@
 import { RequestData } from './types';
 
-export async function replayRequest(request: RequestData): Promise<any> {
-  try {
-    const response = await fetch(request.url, {
-      method: request.method,
-      headers: request.headers,
-      body: request.requestBody?.raw?.[0]?.bytes
-    });
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to replay request:', error);
-    throw error;
+export function modifyRequest(request: RequestData, modifications: {
+  url?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: any;
+}): RequestData {
+  const modifiedRequest: RequestData = {
+    ...request,
+    url: modifications.url || request.url,
+    method: modifications.method || request.method,
+    requestHeaders: modifications.headers || request.requestHeaders
+  };
+
+  if (modifications.body) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(JSON.stringify(modifications.body));
+    modifiedRequest.requestBody = {
+      raw: [{
+        bytes: bytes.buffer as ArrayBuffer
+      }]
+    };
   }
+
+  return modifiedRequest;
+}
+
+export function replayRequest(request: RequestData): Promise<RequestData> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const modifiedRequest: RequestData = {
+        ...request,
+        id: `${request.id}_replay_${Date.now()}`,
+        timestamp: Date.now()
+      };
+
+      const response = await fetch(request.url, {
+        method: request.method,
+        headers: request.requestHeaders,
+        body: request.requestBody?.raw?.[0]?.bytes
+      });
+
+      // 保存响应头
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      modifiedRequest.responseHeaders = responseHeaders;
+
+      // 保存响应体
+      modifiedRequest.response = await response.json();
+
+      resolve(modifiedRequest);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 export async function modifyAndReplayRequest(
@@ -22,7 +66,7 @@ export async function modifyAndReplayRequest(
     headers?: Record<string, string>;
     body?: any;
   }
-): Promise<any> {
+): Promise<RequestData> {
   const modifiedRequest = { ...originalRequest };
   
   if (modifications.url) {
@@ -34,8 +78,8 @@ export async function modifyAndReplayRequest(
   }
   
   if (modifications.headers) {
-    modifiedRequest.headers = {
-      ...modifiedRequest.headers,
+    modifiedRequest.requestHeaders = {
+      ...modifiedRequest.requestHeaders,
       ...modifications.headers
     };
   }
@@ -81,7 +125,7 @@ export function formatRequestForDisplay(request: RequestData): {
   return {
     url: request.url,
     method: request.method,
-    headers: request.headers,
+    headers: request.requestHeaders,
     body: parseRequestBody(request)
   };
 } 
