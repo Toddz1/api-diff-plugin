@@ -7,8 +7,8 @@ const CONFIG = {
   MAX_REQUESTS_IN_MEMORY: 100,
   // 批量保存的请求数量
   BATCH_SAVE_SIZE: 20,
-  // 某个URL的最大捕获次数
-  MAX_CAPTURES_PER_URL: 10,
+  // 某个URL的最大捕获次数 - 不限制
+  MAX_CAPTURES_PER_URL: Infinity,
   // 某个会话的最大请求数量
   MAX_REQUESTS_PER_SESSION: 1000,
   // 会话最长运行时间 (毫秒)
@@ -101,14 +101,7 @@ function getDomain(url: string): string {
 
 // 限制特定URL的捕获次数
 function shouldCaptureUrl(url: string): boolean {
-  const domain = getDomain(url);
-  const count = urlCaptureCount.get(domain) || 0;
-  
-  if (count >= CONFIG.MAX_CAPTURES_PER_URL) {
-    return false;
-  }
-  
-  urlCaptureCount.set(domain, count + 1);
+  // 不再限制URL捕获次数，始终返回true
   return true;
 }
 
@@ -380,9 +373,18 @@ chrome.webRequest.onCompleted.addListener(
       if (completionTime > 10000) { // 10秒以上的请求
         request.timestamp = Date.now();
       }
+
+      // 检查是否为Diff请求
+      const isDiffRequest = request.requestHeaders && 
+                           (request.requestHeaders['X-API-Diff-Request'] === '1' ||
+                            request.requestHeaders['x-api-diff-request'] === '1');
       
-      // 如果响应状态码有效，直接保存
-      if (details.statusCode) {
+      if (isDiffRequest) {
+        console.log('Background: Detected Diff request, capturing full response');
+      }
+      
+      // 如果响应状态码有效且不是Diff请求，简化处理
+      if (details.statusCode && !isDiffRequest) {
         // 直接保存请求，不重新获取响应体
         request.response = {
           status: details.statusCode,
@@ -397,36 +399,56 @@ chrome.webRequest.onCompleted.addListener(
         return;
       }
       
-      // 对于没有状态码的情况，尝试获取响应内容
+      // 对于Diff请求或没有状态码的情况，尝试获取响应内容
       const response = await fetch(request.url, {
         method: request.method,
         headers: request.requestHeaders,
         body: typeof request.requestBody === 'string' ? request.requestBody : 
               request.requestBody ? JSON.stringify(request.requestBody) : undefined,
         // 设置超时
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(10000) // 增加Diff请求的超时时间
       });
       
       // 安全地保存响应体
       const contentType = response.headers.get('content-type');
       try {
-        // 只获取响应头和状态
-        request.response = {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: '[Content not captured to improve performance]'
-        };
-        
-        // 仅对小型JSON响应获取内容
-        if (contentType && contentType.includes('application/json')) {
-          const contentLength = response.headers.get('content-length');
-          if (contentLength && parseInt(contentLength) < 10240) { // 限制为 10KB
-            const responseText = await response.text();
+        // 为Diff请求获取完整响应
+        if (isDiffRequest) {
+          const responseText = await response.text();
+          request.response = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            body: responseText
+          };
+          
+          // 尝试解析JSON
+          if (contentType && contentType.includes('application/json')) {
             try {
               request.response.body = JSON.parse(responseText);
             } catch (e) {
-              request.response.body = responseText.substring(0, 1024); // 限制长度
+              // 保持文本格式
+            }
+          }
+        } else {
+          // 普通请求仅获取响应头和状态
+          request.response = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            body: '[Content not captured to improve performance]'
+          };
+          
+          // 仅对小型JSON响应获取内容
+          if (contentType && contentType.includes('application/json')) {
+            const contentLength = response.headers.get('content-length');
+            if (contentLength && parseInt(contentLength) < 10240) { // 限制为 10KB
+              const responseText = await response.text();
+              try {
+                request.response.body = JSON.parse(responseText);
+              } catch (e) {
+                request.response.body = responseText.substring(0, 1024); // 限制长度
+              }
             }
           }
         }
