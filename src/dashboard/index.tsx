@@ -570,8 +570,11 @@ const Dashboard: React.FC = () => {
         searchOptions.query ? searchOptions : undefined
       );
       
-      console.log(`Dashboard: Loaded ${pagedRequests.length} requests for current page`);
-      setRequests(pagedRequests);
+      // 确保请求按时间戳降序排序，最新的请求显示在前面
+      const sortedRequests = pagedRequests.sort((a, b) => b.timestamp - a.timestamp);
+      
+      console.log(`Dashboard: Loaded ${sortedRequests.length} requests for current page`);
+      setRequests(sortedRequests);
 
       // 更新当前会话的 requestCount
       if (currentSession && currentSession.requestCount !== allRequests.length) {
@@ -621,6 +624,12 @@ const Dashboard: React.FC = () => {
           timestamp: Date.now(),
           responseHeaders: {},
           response: undefined
+        };
+
+        // 添加Diff请求标记
+        newRequest.requestHeaders = {
+          ...newRequest.requestHeaders,
+          'X-API-Diff-Request': '1'
         };
 
         // 安全处理请求体

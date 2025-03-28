@@ -383,86 +383,71 @@ chrome.webRequest.onCompleted.addListener(
         console.log('Background: Detected Diff request, capturing full response');
       }
       
-      // 如果响应状态码有效且不是Diff请求，简化处理
-      if (details.statusCode && !isDiffRequest) {
-        // 直接保存请求，不重新获取响应体
-        request.response = {
-          status: details.statusCode,
-          statusText: details.statusLine?.split(' ').slice(1).join(' ') || '',
-          body: '[Content not captured to improve performance]'
-        };
-        
-        // 添加到保存队列
-        queueRequestForSaving(request);
-        // 从Map中移除
-        requestMap.delete(details.requestId);
-        return;
-      }
-      
-      // 对于Diff请求或没有状态码的情况，尝试获取响应内容
-      const response = await fetch(request.url, {
-        method: request.method,
-        headers: request.requestHeaders,
-        body: typeof request.requestBody === 'string' ? request.requestBody : 
-              request.requestBody ? JSON.stringify(request.requestBody) : undefined,
-        // 设置超时
-        signal: AbortSignal.timeout(10000) // 增加Diff请求的超时时间
-      });
-      
-      // 安全地保存响应体
-      const contentType = response.headers.get('content-type');
+      // 获取响应内容
       try {
-        // 为Diff请求获取完整响应
-        if (isDiffRequest) {
-          const responseText = await response.text();
-          request.response = {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
-            body: responseText
-          };
-          
-          // 尝试解析JSON
-          if (contentType && contentType.includes('application/json')) {
-            try {
-              request.response.body = JSON.parse(responseText);
-            } catch (e) {
-              // 保持文本格式
-            }
-          }
-        } else {
-          // 普通请求仅获取响应头和状态
-          request.response = {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
-            body: '[Content not captured to improve performance]'
-          };
-          
-          // 仅对小型JSON响应获取内容
-          if (contentType && contentType.includes('application/json')) {
-            const contentLength = response.headers.get('content-length');
-            if (contentLength && parseInt(contentLength) < 10240) { // 限制为 10KB
-              const responseText = await response.text();
-              try {
-                request.response.body = JSON.parse(responseText);
-              } catch (e) {
-                request.response.body = responseText.substring(0, 1024); // 限制长度
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to process response data:', e);
+        const response = await fetch(request.url, {
+          method: request.method,
+          headers: request.requestHeaders,
+          body: typeof request.requestBody === 'string' ? request.requestBody : 
+                request.requestBody ? JSON.stringify(request.requestBody) : undefined,
+          // 设置超时
+          signal: AbortSignal.timeout(isDiffRequest ? 10000 : 5000) // 根据请求类型设置不同的超时时间
+        });
+        
+        // 安全地保存响应体
+        const contentType = response.headers.get('content-type');
+        
+        // 获取响应文本
+        const responseText = await response.text();
+        
+        // 处理响应
         request.response = {
           status: response.status,
           statusText: response.statusText,
-          error: 'Failed to process response'
+          headers: Object.fromEntries(response.headers.entries())
         };
+        
+        // 处理响应体
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            // 尝试解析JSON
+            request.response.body = JSON.parse(responseText);
+          } catch (e) {
+            // 如果解析失败，保存文本
+            request.response.body = responseText;
+          }
+        } else {
+          // 非JSON响应直接保存文本
+          request.response.body = responseText;
+        }
+        
+        // 如果这是一个Diff请求，不要保存到存储
+        if (isDiffRequest) {
+          console.log('Background: Diff request completed, not saving to storage');
+          // 仅通知但不持久化
+          chrome.runtime.sendMessage({
+            type: 'DIFF_REQUEST_COMPLETED',
+            requestId: request.id
+          });
+        } else {
+          // 普通请求添加到保存队列
+          queueRequestForSaving(request);
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch response:', error);
+        
+        // 如果获取响应失败，使用原始状态码
+        request.response = {
+          status: details.statusCode,
+          statusText: details.statusLine?.split(' ').slice(1).join(' ') || '',
+          error: `Failed to capture: ${error.message || 'Unknown error'}`
+        };
+        
+        // 如果不是Diff请求，仍然保存
+        if (!isDiffRequest) {
+          queueRequestForSaving(request);
+        }
       }
-      
-      // 添加到保存队列
-      queueRequestForSaving(request);
     } catch (error: any) {
       console.error('Failed to capture response:', error);
       
@@ -471,8 +456,12 @@ chrome.webRequest.onCompleted.addListener(
         error: `Failed to capture: ${error.message || 'Unknown error'}`
       };
       
-      // 仍然尝试保存请求信息
-      queueRequestForSaving(request);
+      // 如果不是Diff请求，仍然保存
+      if (!(request.requestHeaders && 
+           (request.requestHeaders['X-API-Diff-Request'] === '1' ||
+            request.requestHeaders['x-api-diff-request'] === '1'))) {
+        queueRequestForSaving(request);
+      }
     } finally {
       // 清理临时存储的请求数据
       requestMap.delete(details.requestId);

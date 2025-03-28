@@ -278,6 +278,9 @@ class StorageManager {
           });
         }
         
+        // 默认按时间戳降序排序，最新的请求在前面
+        requests = requests.sort((a, b) => b.timestamp - a.timestamp);
+        
         // 应用搜索过滤
         if (searchOptions?.query) {
           const query = searchOptions.query.toLowerCase();
