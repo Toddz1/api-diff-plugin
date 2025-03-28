@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "API Diff Plugin",
   "version": "1.0.0",
   "description": "A Chrome extension for API request capturing and diffing",
@@ -8,16 +8,14 @@
     "webRequestBlocking",
     "storage",
     "tabs",
-    "activeTab"
-  ],
-  "host_permissions": [
+    "activeTab",
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "scripts": ["background.js"],
+    "persistent": true
   },
-  "action": {
+  "browser_action": {
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -36,12 +34,9 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "web_accessible_resources": [{
-    "resources": [
-      "dashboard.html",
-      "dashboard.js",
-      "icons/*"
-    ],
-    "matches": ["<all_urls>"]
-  }]
+  "web_accessible_resources": [
+    "dashboard.html",
+    "dashboard.js",
+    "icons/*"
+  ]
 } 

@@ -18,20 +18,43 @@ const Popup: React.FC = () => {
 
   const handleCaptureClick = () => {
     const newCaptureState = !isCapturing;
-    chrome.runtime.sendMessage(
-      { type: newCaptureState ? 'START_CAPTURE' : 'STOP_CAPTURE' },
-      (response) => {
-        if (response && response.success) {
-          setIsCapturing(newCaptureState);
-        }
+    const messageType = newCaptureState ? 'START_CAPTURE' : 'STOP_CAPTURE';
+    
+    console.log(`Sending ${messageType} message to background script`);
+    chrome.runtime.sendMessage({ type: messageType }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending message:', chrome.runtime.lastError);
+        alert(`Error: ${chrome.runtime.lastError.message || 'Unknown error'}`);
+        return;
       }
-    );
+
+      console.log(`Received response for ${messageType}:`, response);
+      if (response && response.success) {
+        console.log(`Capture state changed to: ${newCaptureState}`);
+        setIsCapturing(newCaptureState);
+      } else {
+        console.error('Failed to change capture state:', response?.error || 'Unknown error');
+        alert(`Failed to ${newCaptureState ? 'start' : 'stop'} capture: ${response?.error || 'Unknown error'}`);
+      }
+    });
   };
 
   const handleOpenDashboard = () => {
     const url = chrome.runtime.getURL('dashboard.html');
     console.log('Opening dashboard at:', url);
-    chrome.tabs.create({ url });
+    try {
+      chrome.tabs.create({ url }, (tab) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error opening dashboard:', chrome.runtime.lastError);
+          alert(`Error opening dashboard: ${chrome.runtime.lastError.message || 'Unknown error'}`);
+        } else {
+          console.log('Dashboard opened in tab:', tab);
+        }
+      });
+    } catch (error) {
+      console.error('Exception opening dashboard:', error);
+      alert(`Failed to open dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const containerStyle: React.CSSProperties = {

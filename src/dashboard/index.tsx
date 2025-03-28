@@ -452,6 +452,7 @@ const RequestItem: React.FC<{
 const Dashboard: React.FC = () => {
   const [sessions, setSessions] = useState<CaptureSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [selectedSessionData, setSelectedSessionData] = useState<CaptureSession | null>(null);
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [pagination, setPagination] = useState<PaginationOptions>(DEFAULT_PAGINATION);
   const [searchOptions, setSearchOptions] = useState<SearchOptions>(DEFAULT_SEARCH_OPTIONS);
@@ -464,37 +465,53 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
+        console.log('Dashboard: Initializing...');
         setIsLoading(true);
         setError(null);
         
         // 初始化存储
+        console.log('Dashboard: Initializing storage...');
         await initializeStorage();
+        console.log('Dashboard: Storage initialized');
         
         // 加载会话和设置
-        const [sessions, settings] = await Promise.all([
-          storageManager.getSessions(),
-          storageManager.getSettings()
-        ]);
+        console.log('Dashboard: Loading sessions and settings...');
+        const sessionsPromise = storageManager.getSessions().catch(err => {
+          console.error('Dashboard: Failed to load sessions:', err);
+          return [];
+        });
+        
+        const settingsPromise = storageManager.getSettings().catch(err => {
+          console.error('Dashboard: Failed to load settings:', err);
+          return { pagination: { pageSize: DEFAULT_PAGINATION.pageSize, page: 0 } };
+        });
+        
+        const [sessions, settings] = await Promise.all([sessionsPromise, settingsPromise]);
+        console.log('Dashboard: Loaded sessions:', sessions.length, 'sessions found');
+        console.log('Dashboard: Loaded settings:', settings);
 
         // 设置会话列表，按时间戳降序排序
         if (Array.isArray(sessions)) {
           setSessions(sessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
         } else {
+          console.warn('Dashboard: Sessions is not an array:', sessions);
           setSessions([]);
         }
 
         // 设置分页选项，使用设置中的值或默认值
-        const pageSetting = settings?.pagination?.pageSize;
-        if (typeof pageSetting === 'number') {
+        if (settings && settings.pagination && typeof settings.pagination.pageSize === 'number') {
+          const pageSize = settings.pagination.pageSize;
+          console.log('Dashboard: Setting page size from settings:', pageSize);
           setPagination(prev => ({
             ...prev,
-            pageSize: pageSetting
+            pageSize
           }));
         }
 
+        console.log('Dashboard: Initialization complete');
       } catch (err) {
-        console.error('Failed to initialize dashboard:', err);
-        setError('Failed to load dashboard data. Please try refreshing the page.');
+        console.error('Dashboard: Failed to initialize dashboard:', err);
+        setError(`Failed to load dashboard data: ${err instanceof Error ? err.message : 'Unknown error'}`);
       } finally {
         setIsLoading(false);
       }
@@ -513,41 +530,60 @@ const Dashboard: React.FC = () => {
   }, [selectedSession, pagination, searchOptions]);
 
   const loadRequests = async () => {
-    if (!selectedSession) return;
+    if (!selectedSession) {
+      console.warn('Dashboard: No session selected, cannot load requests');
+      return;
+    }
 
+    console.log(`Dashboard: Loading requests for session ${selectedSession}...`);
     setIsLoading(true);
     setError(null);
 
     try {
       // 重新获取最新的会话列表
+      console.log('Dashboard: Refreshing sessions list...');
       const updatedSessions = await storageManager.getSessions();
       setSessions(updatedSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
 
+      // 查找当前选中的会话数据
+      const currentSession = updatedSessions.find(s => s.id === selectedSession);
+      if (currentSession) {
+        setSelectedSessionData(currentSession);
+      }
+
+      // 获取请求总数
+      console.log(`Dashboard: Counting requests for session ${selectedSession}...`);
       const allRequests = await storageManager.getSessionRequests(
         selectedSession,
         undefined,
         searchOptions.query ? searchOptions : undefined
       );
+      
+      console.log(`Dashboard: Found ${allRequests.length} requests total`);
       setTotalRequests(allRequests.length);
 
+      // 获取分页请求
+      console.log(`Dashboard: Loading page ${pagination.page} with size ${pagination.pageSize}...`);
       const pagedRequests = await storageManager.getSessionRequests(
         selectedSession,
         pagination,
         searchOptions.query ? searchOptions : undefined
       );
+      
+      console.log(`Dashboard: Loaded ${pagedRequests.length} requests for current page`);
       setRequests(pagedRequests);
 
       // 更新当前会话的 requestCount
-      const currentSession = updatedSessions.find(s => s.id === selectedSession);
-      if (currentSession) {
+      if (currentSession && currentSession.requestCount !== allRequests.length) {
+        console.log(`Dashboard: Updating session ${selectedSession} request count from ${currentSession.requestCount} to ${allRequests.length}`);
         await storageManager.updateSession({
           ...currentSession,
           requestCount: allRequests.length
         });
       }
     } catch (err) {
-      console.error('Failed to load requests:', err);
-      setError('Failed to load requests. Please try again.');
+      console.error('Dashboard: Failed to load requests:', err);
+      setError(`Failed to load requests: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setRequests([]);
       setTotalRequests(0);
     } finally {
@@ -576,7 +612,7 @@ const Dashboard: React.FC = () => {
       const { shouldResend, ...requestChanges } = modifiedRequest;
       
       // 如果选择重新发送请求
-      if (shouldResend) {
+      if (shouldResend && selectedSession) {
         // 创建新的请求对象
         const newRequest: RequestData = {
           ...originalRequest,
@@ -587,42 +623,72 @@ const Dashboard: React.FC = () => {
           response: undefined
         };
 
+        // 安全处理请求体
+        let requestBody = undefined;
+        if (newRequest.method !== 'GET' && newRequest.requestBody) {
+          try {
+            requestBody = typeof newRequest.requestBody === 'string' ? 
+              newRequest.requestBody : 
+              JSON.stringify(newRequest.requestBody);
+          } catch (e: any) {
+            console.error('Failed to stringify request body:', e);
+            requestBody = String(newRequest.requestBody);
+          }
+        }
+
         // 发送请求
         const response = await fetch(newRequest.url, {
           method: newRequest.method,
           headers: newRequest.requestHeaders,
-          body: newRequest.method !== 'GET' && newRequest.requestBody ? 
-            (typeof newRequest.requestBody === 'string' ? 
-              newRequest.requestBody : 
-              JSON.stringify(newRequest.requestBody)
-            ) : undefined
+          body: requestBody
         });
 
         // 获取响应数据
-        const responseData = await response.text();
         try {
-          newRequest.response = JSON.parse(responseData);
-        } catch {
-          newRequest.response = responseData;
+          const responseText = await response.text();
+          const contentType = response.headers.get('content-type');
+          
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              newRequest.response = JSON.parse(responseText);
+            } catch (e: any) {
+              console.error('Failed to parse JSON response:', e);
+              newRequest.response = responseText;
+            }
+          } else {
+            newRequest.response = responseText;
+          }
+        } catch (e: any) {
+          console.error('Failed to get response data:', e);
+          newRequest.response = `[Error reading response: ${e.message}]`;
         }
 
         // 获取响应头
-        response.headers.forEach((value, key) => {
-          if (newRequest.responseHeaders) {
-            newRequest.responseHeaders[key] = value;
-          }
-        });
+        newRequest.responseHeaders = {};
+        try {
+          response.headers.forEach((value, key) => {
+            if (newRequest.responseHeaders) {
+              newRequest.responseHeaders[key] = value;
+            }
+          });
+        } catch (e) {
+          console.error('Failed to process response headers:', e);
+        }
 
         // 保存新请求到存储
-        if (selectedSession) {
+        try {
+          console.log(`Dashboard: Saving modified request to session ${selectedSession}`);
           await storageManager.saveRequest(selectedSession, newRequest);
           // 重新加载请求列表
           await loadRequests();
+        } catch (e: any) {
+          console.error('Failed to save modified request:', e);
+          throw new Error(`Failed to save request: ${e.message}`);
         }
       }
     } catch (error) {
       console.error('Failed to process modified request:', error);
-      throw new Error('Failed to process request. Please check the console for details.');
+      throw new Error(error instanceof Error ? error.message : 'Failed to process request. Please check the console for details.');
     }
   };
 
@@ -695,7 +761,11 @@ const Dashboard: React.FC = () => {
                 <div
                   key={session.id}
                   className={`session-item ${selectedSession === session.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedSession(session.id)}
+                  onClick={() => {
+                    console.log('Dashboard: Selecting session:', session.id);
+                    setSelectedSession(session.id);
+                    setSelectedSessionData(session);
+                  }}
                 >
                   <div className="session-header">
                     <span className="session-id">{session.id}</span>
