@@ -1,8 +1,8 @@
 import { RequestData } from '../utils/types';
-import { StorageManager } from '../utils/storage';
+import { storageManager } from '../utils/storage';
 
-const storageManager = StorageManager.getInstance();
 let isCapturing = false;
+let currentSessionId: string | null = null;
 
 // 用于存储请求数据的临时 Map
 const requestMap = new Map<string, RequestData>();
@@ -17,22 +17,18 @@ function generateRequestId(): string {
 // 保存请求到存储
 async function saveRequest(requestId: string) {
   const request = requestMap.get(requestId);
-  if (!request) return;
+  if (!request || !currentSessionId) return;
 
   try {
-    const sessions = await storageManager.getSessions();
-    const currentSession = sessions.find(s => s.status === 'capturing');
-    if (currentSession) {
-      await storageManager.saveRequest(request);
-    }
-  } catch (error) {
+    await storageManager.saveRequest(currentSessionId, request);
+  } catch (error: any) {
     console.error('Failed to save request:', error);
   }
 }
 
 // 初始化
 chrome.runtime.onInstalled.addListener(() => {
-  storageManager.initialize().catch(error => {
+  storageManager.initialize().catch((error: Error) => {
     console.error('Failed to initialize storage:', error);
   });
 });
@@ -40,7 +36,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // 监听网络请求
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
-    if (!isCapturing) return;
+    if (!isCapturing || !currentSessionId) return;
     // 只捕获 XHR 和 Fetch 请求
     if (details.type === 'xmlhttprequest') {
       const customRequestId = generateRequestId();
@@ -49,14 +45,8 @@ chrome.webRequest.onBeforeRequest.addListener(
         url: details.url,
         method: details.method,
         timestamp: Date.now(),
-        requestBody: details.requestBody ? {
-          raw: details.requestBody.raw?.map(data => ({
-            bytes: data.bytes || new ArrayBuffer(0)
-          }))
-        } : undefined,
         requestHeaders: {},
-        responseHeaders: {},
-        response: null
+        requestBody: details.requestBody ? details.requestBody.raw?.[0]?.bytes : undefined
       };
       
       // 存储请求数据到临时 Map
@@ -70,7 +60,7 @@ chrome.webRequest.onBeforeRequest.addListener(
 // 监听请求头
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
-    if (!isCapturing) return;
+    if (!isCapturing || !currentSessionId) return;
     
     const request = requestMap.get(details.requestId);
     if (!request) return;
@@ -92,7 +82,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 // 监听响应头
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
-    if (!isCapturing) return;
+    if (!isCapturing || !currentSessionId) return;
     
     const request = requestMap.get(details.requestId);
     if (!request) return;
@@ -114,7 +104,7 @@ chrome.webRequest.onHeadersReceived.addListener(
 // 监听响应完成
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
-    if (!isCapturing) return;
+    if (!isCapturing || !currentSessionId) return;
 
     const request = requestMap.get(details.requestId);
     if (!request) return;
@@ -124,7 +114,7 @@ chrome.webRequest.onCompleted.addListener(
       const response = await fetch(request.url, {
         method: request.method,
         headers: request.requestHeaders,
-        body: request.requestBody?.raw?.[0]?.bytes
+        body: request.requestBody
       });
       
       // 保存响应体
@@ -137,7 +127,7 @@ chrome.webRequest.onCompleted.addListener(
       
       // 保存完整的请求数据
       await saveRequest(details.requestId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to capture response:', error);
     } finally {
       // 清理临时存储的请求数据
@@ -166,25 +156,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     
     case 'START_CAPTURE':
-      storageManager.createSession().then(() => {
+      storageManager.createSession().then(session => {
         isCapturing = true;
+        currentSessionId = session.id;
         sendResponse({ success: true });
-      }).catch(error => {
+      }).catch((error: Error) => {
         console.error('Failed to start capture:', error);
         sendResponse({ success: false, error: error.message });
       });
       break;
     
     case 'STOP_CAPTURE':
-      storageManager.endCurrentSession().then(() => {
-        isCapturing = false;
-        // 清理所有临时存储的请求数据
-        requestMap.clear();
-        sendResponse({ success: true });
-      }).catch(error => {
-        console.error('Failed to stop capture:', error);
-        sendResponse({ success: false, error: error.message });
-      });
+      if (currentSessionId) {
+        storageManager.updateSession({
+          id: currentSessionId,
+          timestamp: Date.now(),
+          status: 'completed',
+          requestCount: requestMap.size
+        }).then(() => {
+          isCapturing = false;
+          currentSessionId = null;
+          // 清理所有临时存储的请求数据
+          requestMap.clear();
+          sendResponse({ success: true });
+        }).catch((error: Error) => {
+          console.error('Failed to stop capture:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+      } else {
+        sendResponse({ success: false, error: 'No active session' });
+      }
       break;
     
     default:

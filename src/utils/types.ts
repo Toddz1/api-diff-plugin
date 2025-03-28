@@ -1,27 +1,28 @@
 export interface RequestData {
   id: string;
-  url: string;
-  method: string;
   timestamp: number;
-  requestBody?: {
-    raw?: { bytes: ArrayBuffer }[];
-  };
+  method: string;
+  url: string;
   requestHeaders: Record<string, string>;
+  requestBody?: any;
   responseHeaders?: Record<string, string>;
-  response: any;
-  groupId?: string;
+  response?: any;
+}
+
+export interface ModifiedRequestData extends Partial<RequestData> {
+  shouldResend?: boolean;
 }
 
 export interface CaptureSession {
-  id: string;           // 格式：YYYYMMDD_HH_mm_ss_SSS
-  timestamp: number;    // 创建时间戳
-  requestCount: number; // 请求数量
-  status: 'capturing' | 'completed'; // 会话状态
+  id: string;
+  timestamp: number;
+  status: 'capturing' | 'completed';
+  requestCount: number;
 }
 
 export interface PaginationOptions {
-  page: number;
   pageSize: number;
+  page: number;
 }
 
 export interface SearchOptions {
@@ -36,13 +37,9 @@ export interface SearchOptions {
 }
 
 export interface StorageData {
-  requests: RequestData[];
-  groups: Group[];
   sessions: CaptureSession[];
-  currentSession: string | null;
   settings: {
-    pagination: PaginationOptions;
-    search: SearchOptions;
+    pagination?: PaginationOptions;
   };
 }
 

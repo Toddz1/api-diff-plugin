@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { RequestData, CaptureSession, PaginationOptions, SearchOptions } from '../utils/types';
+import { RequestData, CaptureSession, PaginationOptions, SearchOptions, ModifiedRequestData } from '../utils/types';
 import { storageManager, initializeStorage } from '../utils/storage';
 import './styles.css';
 
@@ -198,22 +198,206 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
   );
 };
 
-const RequestItem: React.FC<{ request: RequestData; displayOptions: typeof DEFAULT_DISPLAY_OPTIONS }> = ({ request, displayOptions }) => {
+// DiffModal 组件
+interface DiffModalProps {
+  request: RequestData;
+  onClose: () => void;
+  onSendRequest: (originalRequest: RequestData, modifiedRequest: ModifiedRequestData) => Promise<void>;
+}
+
+const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }) => {
+  const [modifiedRequest, setModifiedRequest] = useState({
+    url: request.url,
+    method: request.method,
+    requestHeaders: { ...request.requestHeaders },
+    requestBody: request.requestBody
+  });
+  const [shouldResend, setShouldResend] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleChange = (field: string, value: any) => {
+    setModifiedRequest(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await onSendRequest(request, { ...modifiedRequest, shouldResend });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="diff-modal">
+        <div className="modal-header">
+          <h2>Compare and Modify Request</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-content">
+          <div className="form-group">
+            <label>Method:</label>
+            <select 
+              value={modifiedRequest.method}
+              onChange={e => handleChange('method', e.target.value)}
+            >
+              {['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'].map(method => (
+                <option key={method} value={method}>{method}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>URL:</label>
+            <input
+              type="text"
+              value={modifiedRequest.url}
+              onChange={e => handleChange('url', e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Request Headers:</label>
+            <textarea
+              value={JSON.stringify(modifiedRequest.requestHeaders, null, 2)}
+              onChange={e => {
+                try {
+                  handleChange('requestHeaders', JSON.parse(e.target.value));
+                } catch (err) {
+                  // 如果JSON解析失败，仍然更新文本
+                  handleChange('requestHeaders', e.target.value);
+                }
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Request Body:</label>
+            <textarea
+              value={typeof modifiedRequest.requestBody === 'string' 
+                ? modifiedRequest.requestBody 
+                : JSON.stringify(modifiedRequest.requestBody, null, 2)}
+              onChange={e => {
+                try {
+                  handleChange('requestBody', JSON.parse(e.target.value));
+                } catch (err) {
+                  handleChange('requestBody', e.target.value);
+                }
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={shouldResend}
+                onChange={e => setShouldResend(e.target.checked)}
+              />
+              Resend request with modifications
+            </label>
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <div className="diff-preview">
+            <h3>Changes Preview</h3>
+            <div className="diff-section">
+              {Object.entries(modifiedRequest).map(([key, value]) => {
+                const originalValue = request[key as keyof RequestData];
+                if (JSON.stringify(value) !== JSON.stringify(originalValue)) {
+                  return (
+                    <div key={key} className="diff-item">
+                      <h4>{key}</h4>
+                      <div className="diff-content">
+                        <div className="original">
+                          <strong>Original:</strong>
+                          <pre>{JSON.stringify(originalValue, null, 2)}</pre>
+                        </div>
+                        <div className="modified">
+                          <strong>Modified:</strong>
+                          <pre>{JSON.stringify(value, null, 2)}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button 
+            className="cancel-button" 
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button 
+            className="apply-button" 
+            onClick={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Processing...' : 'Apply Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 修改 RequestItem 组件
+const RequestItem: React.FC<{ 
+  request: RequestData; 
+  displayOptions: typeof DEFAULT_DISPLAY_OPTIONS;
+  onSendModifiedRequest?: (originalRequest: RequestData, modifiedRequest: ModifiedRequestData) => Promise<void>;
+}> = ({ 
+  request, 
+  displayOptions,
+  onSendModifiedRequest 
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDiffModal, setShowDiffModal] = useState(false);
 
   return (
     <div className="request-item">
-      <div 
-        className="request-header"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <span className={`method ${request.method.toLowerCase()}`}>
-          {request.method}
-        </span>
-        <span className="url" title={request.url}>
-          {request.url}
-        </span>
+      <div className="request-header">
+        <div 
+          className="request-header-content"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <span className={`method ${request.method.toLowerCase()}`}>
+            {request.method}
+          </span>
+          <span className="url" title={request.url}>
+            {request.url}
+          </span>
+        </div>
+        <button 
+          className="diff-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDiffModal(true);
+          }}
+          title="Compare and modify request"
+        >
+          Diff
+        </button>
       </div>
+      
       <div className="request-info">
         <span className="request-timestamp">
           {new Date(request.timestamp).toLocaleString()}
@@ -252,6 +436,14 @@ const RequestItem: React.FC<{ request: RequestData; displayOptions: typeof DEFAU
             />
           )}
         </div>
+      )}
+
+      {showDiffModal && (
+        <DiffModal
+          request={request}
+          onClose={() => setShowDiffModal(false)}
+          onSendRequest={onSendModifiedRequest || (async () => {})}
+        />
       )}
     </div>
   );
@@ -292,10 +484,11 @@ const Dashboard: React.FC = () => {
         }
 
         // 设置分页选项，使用设置中的值或默认值
-        if (settings?.pagination?.pageSize) {
+        const pageSetting = settings?.pagination?.pageSize;
+        if (typeof pageSetting === 'number') {
           setPagination(prev => ({
             ...prev,
-            pageSize: settings.pagination.pageSize
+            pageSize: pageSetting
           }));
         }
 
@@ -376,6 +569,61 @@ const Dashboard: React.FC = () => {
 
   const formatTimestamp = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
+  };
+
+  const handleModifiedRequest = async (originalRequest: RequestData, modifiedRequest: ModifiedRequestData) => {
+    try {
+      const { shouldResend, ...requestChanges } = modifiedRequest;
+      
+      // 如果选择重新发送请求
+      if (shouldResend) {
+        // 创建新的请求对象
+        const newRequest: RequestData = {
+          ...originalRequest,
+          ...requestChanges,
+          id: `${originalRequest.id}_modified_${Date.now()}`,
+          timestamp: Date.now(),
+          responseHeaders: {},
+          response: undefined
+        };
+
+        // 发送请求
+        const response = await fetch(newRequest.url, {
+          method: newRequest.method,
+          headers: newRequest.requestHeaders,
+          body: newRequest.method !== 'GET' && newRequest.requestBody ? 
+            (typeof newRequest.requestBody === 'string' ? 
+              newRequest.requestBody : 
+              JSON.stringify(newRequest.requestBody)
+            ) : undefined
+        });
+
+        // 获取响应数据
+        const responseData = await response.text();
+        try {
+          newRequest.response = JSON.parse(responseData);
+        } catch {
+          newRequest.response = responseData;
+        }
+
+        // 获取响应头
+        response.headers.forEach((value, key) => {
+          if (newRequest.responseHeaders) {
+            newRequest.responseHeaders[key] = value;
+          }
+        });
+
+        // 保存新请求到存储
+        if (selectedSession) {
+          await storageManager.saveRequest(selectedSession, newRequest);
+          // 重新加载请求列表
+          await loadRequests();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to process modified request:', error);
+      throw new Error('Failed to process request. Please check the console for details.');
+    }
   };
 
   if (isLoading && !selectedSession) {
@@ -525,6 +773,7 @@ const Dashboard: React.FC = () => {
                       key={request.id}
                       request={request}
                       displayOptions={displayOptions}
+                      onSendModifiedRequest={handleModifiedRequest}
                     />
                   ))
                 )}
