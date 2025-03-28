@@ -364,10 +364,14 @@ const RequestItem: React.FC<{
   request: RequestData; 
   displayOptions: typeof DEFAULT_DISPLAY_OPTIONS;
   onSendModifiedRequest?: (originalRequest: RequestData, modifiedRequest: ModifiedRequestData) => Promise<void>;
+  isSelected?: boolean;
+  onCheckboxChange?: (requestId: string, checked: boolean) => void;
 }> = ({ 
   request, 
   displayOptions,
-  onSendModifiedRequest 
+  onSendModifiedRequest,
+  isSelected = false,
+  onCheckboxChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDiffModal, setShowDiffModal] = useState(false);
@@ -375,6 +379,16 @@ const RequestItem: React.FC<{
   return (
     <div className="request-item">
       <div className="request-header">
+        {onCheckboxChange && (
+          <div className="request-checkbox">
+            <input 
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => onCheckboxChange(request.id, e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
         <div 
           className="request-header-content"
           onClick={() => setIsExpanded(!isExpanded)}
@@ -461,6 +475,10 @@ const Dashboard: React.FC = () => {
   const [customPageSize, setCustomPageSize] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 批量选择状态
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -709,6 +727,134 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // 处理session复选框变更
+  const handleSessionCheckboxChange = (sessionId: string, checked: boolean) => {
+    const newSelected = new Set(selectedSessions);
+    if (checked) {
+      newSelected.add(sessionId);
+    } else {
+      newSelected.delete(sessionId);
+    }
+    setSelectedSessions(newSelected);
+  };
+
+  // 处理请求复选框变更
+  const handleRequestCheckboxChange = (requestId: string, checked: boolean) => {
+    const newSelected = new Set(selectedRequests);
+    if (checked) {
+      newSelected.add(requestId);
+    } else {
+      newSelected.delete(requestId);
+    }
+    setSelectedRequests(newSelected);
+  };
+  
+  // 处理全选会话
+  const handleSelectAllSessions = (checked: boolean) => {
+    if (checked) {
+      const allSessionIds = sessions.map(s => s.id);
+      setSelectedSessions(new Set(allSessionIds));
+    } else {
+      setSelectedSessions(new Set());
+    }
+  };
+  
+  // 处理全选请求
+  const handleSelectAllRequests = (checked: boolean) => {
+    if (checked) {
+      const allRequestIds = requests.map(r => r.id);
+      setSelectedRequests(new Set(allRequestIds));
+    } else {
+      setSelectedRequests(new Set());
+    }
+  };
+  
+  // 删除选中的会话
+  const handleDeleteSelectedSessions = async () => {
+    if (selectedSessions.size === 0) return;
+    
+    if (!window.confirm(`确定要删除 ${selectedSessions.size} 个选中的会话吗？`)) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await storageManager.deleteSessions(Array.from(selectedSessions));
+      
+      // 如果当前选中的会话被删除，清除选择
+      if (selectedSession && selectedSessions.has(selectedSession)) {
+        setSelectedSession(null);
+        setSelectedSessionData(null);
+        setRequests([]);
+      }
+      
+      // 重新加载会话列表
+      const updatedSessions = await storageManager.getSessions();
+      setSessions(updatedSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      
+      // 清空选择
+      setSelectedSessions(new Set());
+      
+    } catch (err) {
+      console.error('Dashboard: Failed to delete sessions:', err);
+      setError(`Failed to delete sessions: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // 删除选中的请求
+  const handleDeleteSelectedRequests = async () => {
+    if (!selectedSession || selectedRequests.size === 0) return;
+    
+    if (!window.confirm(`确定要删除 ${selectedRequests.size} 个选中的请求吗？`)) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await storageManager.deleteRequests(selectedSession, Array.from(selectedRequests));
+      
+      // 重新加载请求列表
+      await loadRequests();
+      
+      // 清空选择
+      setSelectedRequests(new Set());
+      
+    } catch (err) {
+      console.error('Dashboard: Failed to delete requests:', err);
+      setError(`Failed to delete requests: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!window.confirm('确定要删除这个会话吗？')) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await storageManager.deleteSession(sessionId);
+      setSelectedSession(null);
+      setSelectedSessionData(null);
+      setRequests([]);
+      await loadRequests();
+    } catch (err) {
+      console.error('Dashboard: Failed to delete session:', err);
+      setError(`Failed to delete session: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isLoading && !selectedSession) {
     return (
       <div className="dashboard loading">
@@ -767,6 +913,25 @@ const Dashboard: React.FC = () => {
       <div className="dashboard-content">
         <aside className="sessions-panel">
           <h2>Capture Sessions</h2>
+          <div className="sessions-actions">
+            <label className="select-all">
+              <input 
+                type="checkbox" 
+                checked={selectedSessions.size > 0 && selectedSessions.size === sessions.length}
+                onChange={(e) => handleSelectAllSessions(e.target.checked)}
+              />
+              全选
+            </label>
+            {selectedSessions.size > 0 && (
+              <button 
+                className="delete-selected"
+                onClick={handleDeleteSelectedSessions}
+                disabled={isLoading}
+              >
+                删除选中 ({selectedSessions.size})
+              </button>
+            )}
+          </div>
           <div className="sessions-list">
             {sessions.length === 0 ? (
               <div className="no-sessions">
@@ -778,26 +943,48 @@ const Dashboard: React.FC = () => {
                 <div
                   key={session.id}
                   className={`session-item ${selectedSession === session.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    console.log('Dashboard: Selecting session:', session.id);
-                    setSelectedSession(session.id);
-                    setSelectedSessionData(session);
-                  }}
                 >
-                  <div className="session-header">
-                    <span className="session-id">{session.id}</span>
-                    <span className={`session-status ${session.status}`}>
-                      {session.status}
-                    </span>
+                  <div className="session-checkbox">
+                    <input 
+                      type="checkbox"
+                      checked={selectedSessions.has(session.id)}
+                      onChange={(e) => handleSessionCheckboxChange(session.id, e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </div>
-                  <div className="session-info">
-                    <span className="session-time">
-                      {formatTimestamp(session.timestamp)}
-                    </span>
-                    <span className="session-count">
-                      {session.requestCount} requests
-                    </span>
+                  <div 
+                    className="session-content"
+                    onClick={() => {
+                      console.log('Dashboard: Selecting session:', session.id);
+                      setSelectedSession(session.id);
+                      setSelectedSessionData(session);
+                    }}
+                  >
+                    <div className="session-header">
+                      <span className="session-id">{session.id}</span>
+                      <span className={`session-status ${session.status}`}>
+                        {session.status}
+                      </span>
+                    </div>
+                    <div className="session-info">
+                      <span className="session-time">
+                        {formatTimestamp(session.timestamp)}
+                      </span>
+                      <span className="session-count">
+                        {session.requestCount} requests
+                      </span>
+                    </div>
                   </div>
+                  <button 
+                    className="delete-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSession(session.id);
+                    }}
+                    title="删除会话"
+                  >
+                    ×
+                  </button>
                 </div>
               ))
             )}
@@ -808,7 +995,28 @@ const Dashboard: React.FC = () => {
           {selectedSession ? (
             <>
               <div className="requests-header">
-                <h2>Requests ({totalRequests})</h2>
+                <div className="requests-title-actions">
+                  <h2>Requests ({totalRequests})</h2>
+                  <div className="requests-actions">
+                    <label className="select-all">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedRequests.size > 0 && selectedRequests.size === requests.length}
+                        onChange={(e) => handleSelectAllRequests(e.target.checked)}
+                      />
+                      全选
+                    </label>
+                    {selectedRequests.size > 0 && (
+                      <button 
+                        className="delete-selected"
+                        onClick={handleDeleteSelectedRequests}
+                        disabled={isLoading}
+                      >
+                        删除选中 ({selectedRequests.size})
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="pagination-controls">
                   <select
                     value={pagination.pageSize}
@@ -861,6 +1069,8 @@ const Dashboard: React.FC = () => {
                       request={request}
                       displayOptions={displayOptions}
                       onSendModifiedRequest={handleModifiedRequest}
+                      isSelected={selectedRequests.has(request.id)}
+                      onCheckboxChange={handleRequestCheckboxChange}
                     />
                   ))
                 )}

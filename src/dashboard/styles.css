@@ -84,6 +84,57 @@ body {
   border-bottom: 1px solid #e0e0e0;
 }
 
+.sessions-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.requests-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.requests-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #555;
+  cursor: pointer;
+}
+
+.delete-selected {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.delete-selected:hover {
+  background-color: #d32f2f;
+}
+
+.delete-selected:disabled {
+  background-color: #e0e0e0;
+  cursor: not-allowed;
+}
+
 .sessions-list {
   flex: 1;
   overflow-y: auto;
@@ -98,6 +149,39 @@ body {
   margin-bottom: 0.75rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.session-content {
+  flex: 1;
+  cursor: pointer;
+}
+
+.delete-button {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.delete-button:hover {
+  background-color: #ffebee;
+  color: #f44336;
 }
 
 .session-item:hover {
@@ -265,6 +349,13 @@ body {
   padding: 0.75rem;
   transition: background-color 0.2s ease;
   cursor: pointer;
+}
+
+.request-checkbox {
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .request-header-content {

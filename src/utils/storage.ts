@@ -469,6 +469,116 @@ class StorageManager {
     });
   }
   
+  // 批量删除会话
+  async deleteSessions(sessionIds: string[]): Promise<void> {
+    return this.ensureInitialized(async () => {
+      try {
+        console.log(`StorageManager: Deleting ${sessionIds.length} sessions...`);
+        
+        // 批量删除会话的请求数据
+        for (const sessionId of sessionIds) {
+          const sessionKey = `session_${sessionId}`;
+          await new Promise<void>((resolve, reject) => {
+            chrome.storage.local.remove(sessionKey, () => {
+              if (chrome.runtime.lastError) {
+                console.error(`StorageManager: Error removing session ${sessionId} data`, chrome.runtime.lastError);
+                // 继续删除其他会话
+                resolve();
+                return;
+              }
+              resolve();
+            });
+          });
+          
+          // 从缓存中删除
+          this.sessionCache.delete(sessionId);
+          this.requestsCache.delete(`requests_${sessionId}`);
+        }
+        
+        // 从会话列表中批量删除
+        const data = await this.getStorageData();
+        const updatedSessions = data.sessions.filter(s => !sessionIds.includes(s.id));
+        data.sessions = updatedSessions;
+        await this.setStorageData(data);
+        
+        console.log(`StorageManager: ${sessionIds.length} sessions deleted successfully`);
+      } catch (error) {
+        console.error(`StorageManager: Failed to delete sessions:`, error);
+        throw new Error(`Failed to delete sessions: ${error}`);
+      }
+    });
+  }
+  
+  // 批量删除请求
+  async deleteRequests(sessionId: string, requestIds: string[]): Promise<void> {
+    return this.ensureInitialized(async () => {
+      try {
+        console.log(`StorageManager: Deleting ${requestIds.length} requests from session ${sessionId}...`);
+        
+        const sessionKey = `session_${sessionId}`;
+        
+        // 获取当前会话的请求列表
+        const result = await new Promise<{[key: string]: RequestData[]}>((resolve, reject) => {
+          chrome.storage.local.get(sessionKey, (result) => {
+            if (chrome.runtime.lastError) {
+              console.error('StorageManager: Error getting session requests', chrome.runtime.lastError);
+              reject(chrome.runtime.lastError);
+              return;
+            }
+            resolve(result);
+          });
+        });
+        
+        const requests = result[sessionKey] || [];
+        
+        // 过滤掉要删除的请求
+        const filteredRequests = requests.filter(request => !requestIds.includes(request.id));
+        
+        // 更新缓存
+        const cacheKey = `requests_${sessionId}`;
+        this.requestsCache.set(cacheKey, {
+          data: filteredRequests,
+          timestamp: Date.now()
+        });
+        
+        // 保存到存储
+        await new Promise<void>((resolve, reject) => {
+          chrome.storage.local.set({ [sessionKey]: filteredRequests }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('StorageManager: Error saving filtered requests', chrome.runtime.lastError);
+              reject(chrome.runtime.lastError);
+              return;
+            }
+            resolve();
+          });
+        });
+        
+        // 更新会话中的请求计数
+        const cachedSession = this.sessionCache.get(sessionId);
+        if (cachedSession) {
+          cachedSession.data.requestCount = filteredRequests.length;
+          this.sessionCache.set(sessionId, {
+            data: cachedSession.data,
+            timestamp: Date.now()
+          });
+          
+          // 更新存储中的会话信息
+          const data = await this.getStorageData();
+          const sessionIndex = data.sessions.findIndex(s => s.id === sessionId);
+          if (sessionIndex !== -1) {
+            data.sessions[sessionIndex].requestCount = filteredRequests.length;
+            await this.setStorageData(data);
+          }
+        }
+        
+        console.log(`StorageManager: ${requestIds.length} requests deleted successfully`);
+      } catch (error) {
+        console.error(`StorageManager: Failed to delete requests:`, error);
+        throw new Error(`Failed to delete requests: ${error}`);
+      }
+    });
+  }
+  
   // 清理所有会话数据
   async clearAllData(): Promise<void> {
     return this.ensureInitialized(async () => {
