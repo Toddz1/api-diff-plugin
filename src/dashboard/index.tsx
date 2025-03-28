@@ -551,16 +551,33 @@ const Dashboard: React.FC = () => {
         setSelectedSessionData(currentSession);
       }
 
-      // 获取请求总数
-      console.log(`Dashboard: Counting requests for session ${selectedSession}...`);
-      const allRequests = await storageManager.getSessionRequests(
+      // 先获取会话的所有请求（不应用搜索过滤）
+      console.log(`Dashboard: Getting all requests for session ${selectedSession}...`);
+      const allSessionRequests = await storageManager.getSessionRequests(
+        selectedSession,
+        undefined,
+        undefined
+      );
+      
+      // 更新会话的总请求数（不受搜索影响）
+      if (currentSession && currentSession.requestCount !== allSessionRequests.length) {
+        console.log(`Dashboard: Updating session ${selectedSession} request count from ${currentSession.requestCount} to ${allSessionRequests.length}`);
+        await storageManager.updateSession({
+          ...currentSession,
+          requestCount: allSessionRequests.length
+        });
+      }
+      
+      // 获取搜索过滤后的请求总数
+      console.log(`Dashboard: Counting filtered requests for session ${selectedSession}...`);
+      const filteredRequests = await storageManager.getSessionRequests(
         selectedSession,
         undefined,
         searchOptions.query ? searchOptions : undefined
       );
       
-      console.log(`Dashboard: Found ${allRequests.length} requests total`);
-      setTotalRequests(allRequests.length);
+      console.log(`Dashboard: Found ${filteredRequests.length} requests matching search criteria`);
+      setTotalRequests(filteredRequests.length);
 
       // 获取分页请求
       console.log(`Dashboard: Loading page ${pagination.page} with size ${pagination.pageSize}...`);
@@ -575,15 +592,6 @@ const Dashboard: React.FC = () => {
       
       console.log(`Dashboard: Loaded ${sortedRequests.length} requests for current page`);
       setRequests(sortedRequests);
-
-      // 更新当前会话的 requestCount
-      if (currentSession && currentSession.requestCount !== allRequests.length) {
-        console.log(`Dashboard: Updating session ${selectedSession} request count from ${currentSession.requestCount} to ${allRequests.length}`);
-        await storageManager.updateSession({
-          ...currentSession,
-          requestCount: allRequests.length
-        });
-      }
     } catch (err) {
       console.error('Dashboard: Failed to load requests:', err);
       setError(`Failed to load requests: ${err instanceof Error ? err.message : 'Unknown error'}`);
