@@ -4,11 +4,30 @@ import { StorageManager } from '../utils/storage';
 const storageManager = StorageManager.getInstance();
 let isCapturing = false;
 
+// 用于存储请求数据的临时 Map
+const requestMap = new Map<string, RequestData>();
+
 // 生成唯一的请求 ID
 function generateRequestId(): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return `${timestamp}_${random}`;
+}
+
+// 保存请求到存储
+async function saveRequest(requestId: string) {
+  const request = requestMap.get(requestId);
+  if (!request) return;
+
+  try {
+    const sessions = await storageManager.getSessions();
+    const currentSession = sessions.find(s => s.status === 'capturing');
+    if (currentSession) {
+      await storageManager.saveRequest(request);
+    }
+  } catch (error) {
+    console.error('Failed to save request:', error);
+  }
 }
 
 // 初始化
@@ -24,8 +43,9 @@ chrome.webRequest.onBeforeRequest.addListener(
     if (!isCapturing) return;
     // 只捕获 XHR 和 Fetch 请求
     if (details.type === 'xmlhttprequest') {
+      const customRequestId = generateRequestId();
       const requestData: RequestData = {
-        id: generateRequestId(),
+        id: customRequestId,
         url: details.url,
         method: details.method,
         timestamp: Date.now(),
@@ -39,27 +59,22 @@ chrome.webRequest.onBeforeRequest.addListener(
         response: null
       };
       
-      // 存储 requestId 映射关系
-      requestIdMap.set(details.requestId, requestData.id);
-      
-      storageManager.saveRequest(requestData).catch(error => {
-        console.error('Failed to save request:', error);
-      });
+      // 存储请求数据到临时 Map
+      requestMap.set(details.requestId, requestData);
     }
   },
   { urls: ["<all_urls>"] },
   ["requestBody"]
 );
 
-// 用于存储 Chrome requestId 到自定义 requestId 的映射
-const requestIdMap = new Map<string, string>();
-
 // 监听请求头
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
     if (!isCapturing) return;
-    console.log('Captured request headers:', details.requestHeaders);
     
+    const request = requestMap.get(details.requestId);
+    if (!request) return;
+
     // 将 HttpHeader[] 转换为 Record<string, string>
     const headers: Record<string, string> = {};
     details.requestHeaders?.forEach(header => {
@@ -68,24 +83,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
       }
     });
 
-    const customRequestId = requestIdMap.get(details.requestId);
-    if (!customRequestId) return;
-
-    storageManager.getSessions().then(sessions => {
-      const currentSession = sessions.find(s => s.status === 'capturing');
-      if (currentSession) {
-        return storageManager.getSessionRequests(currentSession.id);
-      }
-      return [];
-    }).then(requests => {
-      const request = requests.find(r => r.id === customRequestId);
-      if (request) {
-        request.requestHeaders = headers;
-        return storageManager.saveRequest(request);
-      }
-    }).catch(error => {
-      console.error('Failed to update request headers:', error);
-    });
+    request.requestHeaders = headers;
   },
   { urls: ["<all_urls>"] },
   ["requestHeaders", "extraHeaders"]
@@ -96,6 +94,9 @@ chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
     if (!isCapturing) return;
     
+    const request = requestMap.get(details.requestId);
+    if (!request) return;
+
     // 将 HttpHeader[] 转换为 Record<string, string>
     const headers: Record<string, string> = {};
     details.responseHeaders?.forEach(header => {
@@ -104,76 +105,55 @@ chrome.webRequest.onHeadersReceived.addListener(
       }
     });
 
-    const customRequestId = requestIdMap.get(details.requestId);
-    if (!customRequestId) return;
-
-    storageManager.getSessions().then(sessions => {
-      const currentSession = sessions.find(s => s.status === 'capturing');
-      if (currentSession) {
-        return storageManager.getSessionRequests(currentSession.id);
-      }
-      return [];
-    }).then(requests => {
-      const request = requests.find(r => r.id === customRequestId);
-      if (request) {
-        request.responseHeaders = headers;
-        return storageManager.saveRequest(request);
-      }
-    }).catch(error => {
-      console.error('Failed to update response headers:', error);
-    });
+    request.responseHeaders = headers;
   },
   { urls: ["<all_urls>"] },
   ["responseHeaders", "extraHeaders"]
 );
 
-// 监听响应体
-chrome.webRequest.onResponseStarted.addListener(
-  (details) => {
+// 监听响应完成
+chrome.webRequest.onCompleted.addListener(
+  async (details) => {
     if (!isCapturing) return;
 
-    const customRequestId = requestIdMap.get(details.requestId);
-    if (!customRequestId) return;
+    const request = requestMap.get(details.requestId);
+    if (!request) return;
 
-    storageManager.getSessions().then(sessions => {
-      const currentSession = sessions.find(s => s.status === 'capturing');
-      if (currentSession) {
-        return storageManager.getSessionRequests(currentSession.id);
+    try {
+      // 使用 Fetch API 重新发送请求以获取响应体
+      const response = await fetch(request.url, {
+        method: request.method,
+        headers: request.requestHeaders,
+        body: request.requestBody?.raw?.[0]?.bytes
+      });
+      
+      // 保存响应体
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        request.response = await response.json();
+      } else {
+        request.response = await response.text();
       }
-      return [];
-    }).then(async requests => {
-      const request = requests.find(r => r.id === customRequestId);
-      if (request) {
-        try {
-          // 使用 Fetch API 重新发送请求以获取响应体
-          const response = await fetch(request.url, {
-            method: request.method,
-            headers: request.requestHeaders,
-            body: request.requestBody?.raw?.[0]?.bytes
-          });
-          
-          // 保存响应体
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            request.response = await response.json();
-          } else {
-            request.response = await response.text();
-          }
-          
-          await storageManager.saveRequest(request);
-          
-          // 清理 requestId 映射
-          requestIdMap.delete(details.requestId);
-        } catch (error) {
-          console.error('Failed to capture response:', error);
-        }
-      }
-    }).catch(error => {
-      console.error('Failed to update request with response:', error);
-    });
+      
+      // 保存完整的请求数据
+      await saveRequest(details.requestId);
+    } catch (error) {
+      console.error('Failed to capture response:', error);
+    } finally {
+      // 清理临时存储的请求数据
+      requestMap.delete(details.requestId);
+    }
   },
-  { urls: ["<all_urls>"] },
-  ["responseHeaders"]
+  { urls: ["<all_urls>"] }
+);
+
+// 监听请求错误
+chrome.webRequest.onErrorOccurred.addListener(
+  (details) => {
+    // 清理临时存储的请求数据
+    requestMap.delete(details.requestId);
+  },
+  { urls: ["<all_urls>"] }
 );
 
 // 监听来自 popup 的消息
@@ -198,6 +178,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'STOP_CAPTURE':
       storageManager.endCurrentSession().then(() => {
         isCapturing = false;
+        // 清理所有临时存储的请求数据
+        requestMap.clear();
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Failed to stop capture:', error);

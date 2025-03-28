@@ -297,6 +297,18 @@ export class StorageManager {
       await this.setStorageData(data);
     }
   }
+
+  // 更新会话信息
+  async updateSession(session: CaptureSession): Promise<void> {
+    return this.ensureInitialized(async () => {
+      const data = await this.getStorageData();
+      const index = data.sessions.findIndex(s => s.id === session.id);
+      if (index !== -1) {
+        data.sessions[index] = session;
+        await this.setStorageData(data);
+      }
+    });
+  }
 }
 
 // 创建 storageManager 实例

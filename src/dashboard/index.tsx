@@ -20,12 +20,250 @@ const DEFAULT_PAGINATION: PaginationOptions = {
   page: 0
 };
 
+const DEFAULT_DISPLAY_OPTIONS = {
+  requestHeaders: false,
+  requestBody: false,
+  responseHeaders: false,
+  responseBody: true
+};
+
+// 复制到剪贴板函数
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    // 可以添加一个提示，但这里保持简单
+    console.log('Copied to clipboard');
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+  });
+};
+
+// 格式化 JSON 数据
+const formatJson = (data: any): string => {
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch (error) {
+    return String(data);
+  }
+};
+
+// 可折叠的部分组件
+interface CollapsibleSectionProps {
+  title: string;
+  content: any;
+  defaultExpanded?: boolean;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, content, defaultExpanded = true }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const formattedContent = formatJson(content);
+
+  return (
+    <div className="collapsible-section">
+      <div className="section-header" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="header-left">
+          <span className={`collapse-icon ${isExpanded ? 'expanded' : ''}`}>
+            {isExpanded ? '▼' : '▶'}
+          </span>
+          <h3>
+            {title}
+            <button 
+              className="copy-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                copyToClipboard(formattedContent);
+              }}
+              title="Copy to clipboard"
+            >
+              📋
+            </button>
+          </h3>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="section-content">
+          <pre>{formattedContent}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 分页组件
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange }) => {
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 7; // 最多显示的页码数
+    const ellipsis = <span key="ellipsis" className="page-ellipsis">...</span>;
+
+    if (totalPages <= maxVisiblePages) {
+      // 如果总页数小于等于最大显示数，显示所有页码
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(
+          <button
+            key={i}
+            className={`page-number ${currentPage + 1 === i ? 'active' : ''}`}
+            onClick={() => onPageChange(i - 1)}
+          >
+            {i}
+          </button>
+        );
+      }
+    } else {
+      // 总是显示第一页
+      pages.push(
+        <button
+          key={1}
+          className={`page-number ${currentPage + 1 === 1 ? 'active' : ''}`}
+          onClick={() => onPageChange(0)}
+        >
+          1
+        </button>
+      );
+
+      // 计算中间页码的范围
+      let startPage = Math.max(2, currentPage - 1);
+      let endPage = Math.min(totalPages - 1, currentPage + 3);
+
+      // 调整范围以保持固定数量的页码
+      if (currentPage <= 3) {
+        endPage = 5;
+      } else if (currentPage >= totalPages - 4) {
+        startPage = totalPages - 4;
+      }
+
+      // 添加前面的省略号
+      if (startPage > 2) {
+        pages.push(ellipsis);
+      }
+
+      // 添加中间的页码
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(
+          <button
+            key={i}
+            className={`page-number ${currentPage + 1 === i ? 'active' : ''}`}
+            onClick={() => onPageChange(i - 1)}
+          >
+            {i}
+          </button>
+        );
+      }
+
+      // 添加后面的省略号
+      if (endPage < totalPages - 1) {
+        pages.push(ellipsis);
+      }
+
+      // 总是显示最后一页
+      pages.push(
+        <button
+          key={totalPages}
+          className={`page-number ${currentPage + 1 === totalPages ? 'active' : ''}`}
+          onClick={() => onPageChange(totalPages - 1)}
+        >
+          {totalPages}
+        </button>
+      );
+    }
+
+    return pages;
+  };
+
+  return (
+    <div className="pagination">
+      <button
+        className="page-nav"
+        disabled={currentPage === 0}
+        onClick={() => onPageChange(currentPage - 1)}
+      >
+        Previous
+      </button>
+      <div className="page-numbers">
+        {renderPageNumbers()}
+      </div>
+      <button
+        className="page-nav"
+        disabled={currentPage >= totalPages - 1}
+        onClick={() => onPageChange(currentPage + 1)}
+      >
+        Next
+      </button>
+    </div>
+  );
+};
+
+const RequestItem: React.FC<{ request: RequestData; displayOptions: typeof DEFAULT_DISPLAY_OPTIONS }> = ({ request, displayOptions }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="request-item">
+      <div 
+        className="request-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span className={`method ${request.method.toLowerCase()}`}>
+          {request.method}
+        </span>
+        <span className="url" title={request.url}>
+          {request.url}
+        </span>
+      </div>
+      <div className="request-info">
+        <span className="request-timestamp">
+          {new Date(request.timestamp).toLocaleString()}
+        </span>
+        <span className="request-id">
+          request_id: {request.id}
+        </span>
+      </div>
+      {isExpanded && (
+        <div className="request-details">
+          {displayOptions.requestHeaders && (
+            <CollapsibleSection 
+              title="Request Headers" 
+              content={request.requestHeaders} 
+            />
+          )}
+          
+          {request.requestBody && displayOptions.requestBody && (
+            <CollapsibleSection 
+              title="Request Body" 
+              content={request.requestBody} 
+            />
+          )}
+
+          {request.responseHeaders && displayOptions.responseHeaders && (
+            <CollapsibleSection 
+              title="Response Headers" 
+              content={request.responseHeaders} 
+            />
+          )}
+          
+          {request.response && displayOptions.responseBody && (
+            <CollapsibleSection 
+              title="Response Body" 
+              content={request.response} 
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const [sessions, setSessions] = useState<CaptureSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [pagination, setPagination] = useState<PaginationOptions>(DEFAULT_PAGINATION);
   const [searchOptions, setSearchOptions] = useState<SearchOptions>(DEFAULT_SEARCH_OPTIONS);
+  const [displayOptions, setDisplayOptions] = useState(DEFAULT_DISPLAY_OPTIONS);
   const [totalRequests, setTotalRequests] = useState(0);
   const [customPageSize, setCustomPageSize] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -88,6 +326,10 @@ const Dashboard: React.FC = () => {
     setError(null);
 
     try {
+      // 重新获取最新的会话列表
+      const updatedSessions = await storageManager.getSessions();
+      setSessions(updatedSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+
       const allRequests = await storageManager.getSessionRequests(
         selectedSession,
         undefined,
@@ -101,6 +343,15 @@ const Dashboard: React.FC = () => {
         searchOptions.query ? searchOptions : undefined
       );
       setRequests(pagedRequests);
+
+      // 更新当前会话的 requestCount
+      const currentSession = updatedSessions.find(s => s.id === selectedSession);
+      if (currentSession) {
+        await storageManager.updateSession({
+          ...currentSession,
+          requestCount: allRequests.length
+        });
+      }
     } catch (err) {
       console.error('Failed to load requests:', err);
       setError('Failed to load requests. Please try again.');
@@ -125,14 +376,6 @@ const Dashboard: React.FC = () => {
 
   const formatTimestamp = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
-  };
-
-  const formatJson = (data: any) => {
-    try {
-      return JSON.stringify(data, null, 2);
-    } catch (e) {
-      return 'Unable to parse data';
-    }
   };
 
   if (isLoading && !selectedSession) {
@@ -242,42 +485,27 @@ const Dashboard: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <div className="custom-page-size">
-                    <input
-                      type="number"
-                      placeholder="Custom size"
-                      value={customPageSize}
-                      onChange={e => setCustomPageSize(e.target.value)}
-                      min="1"
-                    />
-                    <button onClick={handleCustomPageSize}>Apply</button>
-                  </div>
-                  <div className="page-navigation">
-                    <button
-                      disabled={pagination.page === 0}
-                      onClick={() => setPagination(prev => ({
-                        ...prev,
-                        page: prev.page - 1
-                      }))}
-                    >
-                      Previous
-                    </button>
-                    <span>
-                      Page {pagination.page + 1} of{' '}
-                      {Math.ceil(totalRequests / pagination.pageSize)}
-                    </span>
-                    <button
-                      disabled={
-                        (pagination.page + 1) * pagination.pageSize >= totalRequests
-                      }
-                      onClick={() => setPagination(prev => ({
-                        ...prev,
-                        page: prev.page + 1
-                      }))}
-                    >
-                      Next
-                    </button>
-                  </div>
+                  <Pagination
+                    currentPage={pagination.page}
+                    totalPages={Math.ceil(totalRequests / pagination.pageSize)}
+                    onPageChange={page => setPagination(prev => ({ ...prev, page }))}
+                  />
+                </div>
+                <div className="display-options">
+                  <span>Display sections: </span>
+                  {Object.entries(displayOptions).map(([key, value]) => (
+                    <label key={key}>
+                      <input
+                        type="checkbox"
+                        checked={value}
+                        onChange={e => setDisplayOptions(prev => ({
+                          ...prev,
+                          [key]: e.target.checked
+                        }))}
+                      />
+                      {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -293,49 +521,11 @@ const Dashboard: React.FC = () => {
                   </div>
                 ) : (
                   requests.map(request => (
-                    <div key={request.id} className="request-item">
-                      <div className="request-header">
-                        <span className={`method ${request.method.toLowerCase()}`}>
-                          {request.method}
-                        </span>
-                        <span className="url" title={request.url}>
-                          {request.url}
-                        </span>
-                      </div>
-                      <div className="request-info">
-                        <span className="request-timestamp">
-                          {formatTimestamp(request.timestamp)}
-                        </span>
-                        <span className="request-id">
-                          request_id: {request.id}
-                        </span>
-                      </div>
-                      <div className="request-details">
-                        <h3>Request Headers</h3>
-                        <pre>{formatJson(request.requestHeaders)}</pre>
-                        
-                        {request.requestBody && (
-                          <>
-                            <h3>Request Body</h3>
-                            <pre>{formatJson(request.requestBody)}</pre>
-                          </>
-                        )}
-
-                        {request.responseHeaders && (
-                          <>
-                            <h3>Response Headers</h3>
-                            <pre>{formatJson(request.responseHeaders)}</pre>
-                          </>
-                        )}
-                        
-                        {request.response && (
-                          <>
-                            <h3>Response Body</h3>
-                            <pre>{formatJson(request.response)}</pre>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    <RequestItem 
+                      key={request.id}
+                      request={request}
+                      displayOptions={displayOptions}
+                    />
                   ))
                 )}
               </div>
