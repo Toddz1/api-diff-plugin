@@ -1,0 +1,34 @@
+{
+  "name": "api-diff-plugin",
+  "version": "1.0.0",
+  "description": "A Chrome extension for API request capturing and diffing",
+  "main": "dist/background/index.js",
+  "scripts": {
+    "build": "npm run generate-icons && webpack --config webpack.config.js",
+    "watch": "webpack --config webpack.config.js --watch",
+    "dev": "webpack --config webpack.config.js --mode development",
+    "prod": "webpack --config webpack.config.js --mode production",
+    "generate-icons": "node scripts/generate-icons.js"
+  },
+  "dependencies": {
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "diff": "^5.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/diff": "^5.0.3",
+    "@types/node": "^20.11.19",
+    "copy-webpack-plugin": "^12.0.2",
+    "css-loader": "^6.10.0",
+    "html-webpack-plugin": "^5.6.3",
+    "sharp": "^0.33.2",
+    "style-loader": "^3.3.4",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.1",
+    "webpack-cli": "^5.1.4"
+  }
+}
