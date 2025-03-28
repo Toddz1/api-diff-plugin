@@ -21,9 +21,9 @@ const DEFAULT_PAGINATION: PaginationOptions = {
 };
 
 const DEFAULT_DISPLAY_OPTIONS = {
-  requestHeaders: true,
-  requestBody: true,
-  responseHeaders: true,
+  requestHeaders: false,
+  requestBody: false,
+  responseHeaders: false,
   responseBody: true,
   duration: true // 默认显示耗时
 };
@@ -806,27 +806,45 @@ const Dashboard: React.FC = () => {
           const responseText = await response.text();
           const contentType = response.headers.get('content-type');
           
+          // 首先设置响应的基本结构和状态码
+          newRequest.response = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {},
+            body: undefined
+          };
+          
+          // 然后处理响应体
           if (contentType && contentType.includes('application/json')) {
             try {
-              newRequest.response = JSON.parse(responseText);
+              // 尝试解析JSON
+              newRequest.response.body = JSON.parse(responseText);
             } catch (e: any) {
               console.error('Failed to parse JSON response:', e);
-              newRequest.response = responseText;
+              newRequest.response.body = responseText;
             }
           } else {
-            newRequest.response = responseText;
+            // 非JSON响应直接保存文本
+            newRequest.response.body = responseText;
           }
         } catch (e: any) {
           console.error('Failed to get response data:', e);
-          newRequest.response = `[Error reading response: ${e.message}]`;
+          newRequest.response = {
+            status: 0,
+            statusText: 'Error',
+            error: `Error reading response: ${e.message}`
+          };
         }
 
         // 获取响应头
-        newRequest.responseHeaders = {};
+        if (newRequest.response && !newRequest.response.headers) {
+          newRequest.response.headers = {};
+        }
+        
         try {
           response.headers.forEach((value, key) => {
-            if (newRequest.responseHeaders) {
-              newRequest.responseHeaders[key] = value;
+            if (newRequest.response && newRequest.response.headers) {
+              newRequest.response.headers[key] = value;
             }
           });
         } catch (e) {
