@@ -454,6 +454,38 @@ const SourceModal: React.FC<SourceModalProps> = ({ request, onClose }) => {
   );
 };
 
+// 生成curl命令的函数
+const generateCurlCommand = (request: RequestData): string => {
+  let command = `curl -X ${request.method} "${request.url}"`;
+  
+  // 添加请求头
+  if (request.requestHeaders && Object.keys(request.requestHeaders).length > 0) {
+    Object.entries(request.requestHeaders).forEach(([key, value]) => {
+      // 跳过某些特殊的头部，如X-API-Diff-Request
+      if (key !== 'X-API-Diff-Request') {
+        command += ` \\\n  -H "${key}: ${value.replace(/"/g, '\\"')}"`;
+      }
+    });
+  }
+  
+  // 添加请求体
+  if (request.requestBody && request.method !== 'GET') {
+    let bodyStr = '';
+    if (typeof request.requestBody === 'string') {
+      bodyStr = request.requestBody;
+    } else {
+      try {
+        bodyStr = JSON.stringify(request.requestBody);
+      } catch (e) {
+        bodyStr = String(request.requestBody);
+      }
+    }
+    command += ` \\\n  -d '${bodyStr.replace(/'/g, "'\\''")}'`;
+  }
+  
+  return command;
+};
+
 // 修改 RequestItem 组件
 const RequestItem: React.FC<{ 
   request: RequestData; 
@@ -516,6 +548,21 @@ const RequestItem: React.FC<{
           </span>
         </div>
         <div className="request-actions">
+          <button 
+            className="curl-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const curlCommand = generateCurlCommand(request);
+              navigator.clipboard.writeText(curlCommand).then(() => {
+                console.log('Curl command copied to clipboard');
+              }).catch(err => {
+                console.error('Failed to copy curl command:', err);
+              });
+            }}
+            title="导出为curl命令"
+          >
+            Curl
+          </button>
           <button 
             className="source-button"
             onClick={(e) => {
