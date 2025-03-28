@@ -36,6 +36,7 @@ export interface SearchOptions {
     requestBody: boolean;
     responseHeaders: boolean;
     responseBody: boolean;
+    id: boolean;
   };
 }
 

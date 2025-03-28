@@ -13,7 +13,8 @@ const DEFAULT_SEARCH_OPTIONS: SearchOptions = {
     requestHeaders: false,
     requestBody: false,
     responseHeaders: false,
-    responseBody: false
+    responseBody: false,
+    id: true // 修改为true，默认启用request_id搜索
   }
 };
 
@@ -301,17 +302,6 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
             />
           </div>
 
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={shouldSaveRequest}
-                onChange={e => setShouldSaveRequest(e.target.checked)}
-              />
-              保存为新请求记录
-            </label>
-          </div>
-
           {error && <div className="error-message">{error}</div>}
 
           <div className="diff-preview">
@@ -343,20 +333,32 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
         </div>
 
         <div className="modal-footer">
-          <button 
-            className="cancel-button" 
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            取消
-          </button>
-          <button 
-            className="apply-button" 
-            onClick={handleSubmit}
-            disabled={isLoading}
-          >
-            {isLoading ? '处理中...' : '请求'}
-          </button>
+          <div className="save-option">
+            <label>
+              <input
+                type="checkbox"
+                checked={shouldSaveRequest}
+                onChange={e => setShouldSaveRequest(e.target.checked)}
+              />
+              保存为新请求记录
+            </label>
+          </div>
+          <div className="buttons">
+            <button 
+              className="cancel-button" 
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              取消
+            </button>
+            <button 
+              className="apply-button" 
+              onClick={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? '处理中...' : '请求'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1543,6 +1545,18 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // 处理搜索字段变更
+  const handleSearchFieldChange = (field: keyof SearchOptions['fields']) => {
+    setSearchOptions(prev => ({
+      ...prev,
+      fields: {
+        ...prev.fields,
+        [field]: !prev.fields[field]
+      }
+    }));
+  };
+
+  // 删除会话
   const handleDeleteSession = async (sessionId: string) => {
     if (!window.confirm('确定要删除这个会话吗？')) {
       return;
@@ -1600,22 +1614,54 @@ const Dashboard: React.FC = () => {
             }))}
           />
           <div className="search-options">
-            {Object.entries(searchOptions.fields).map(([key, value]) => (
-              <label key={key}>
-                <input
-                  type="checkbox"
-                  checked={value}
-                  onChange={e => setSearchOptions(prev => ({
-                    ...prev,
-                    fields: {
-                      ...prev.fields,
-                      [key]: e.target.checked
-                    }
-                  }))}
-                />
-                {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
-              </label>
-            ))}
+            <label className="search-option">
+              <input
+                type="checkbox"
+                checked={searchOptions.fields.url}
+                onChange={() => handleSearchFieldChange('url')}
+              />
+              <span>URL</span>
+            </label>
+            <label className="search-option">
+              <input
+                type="checkbox"
+                checked={searchOptions.fields.id}
+                onChange={() => handleSearchFieldChange('id')}
+              />
+              <span>ID</span>
+            </label>
+            <label className="search-option">
+              <input
+                type="checkbox"
+                checked={searchOptions.fields.requestHeaders}
+                onChange={() => handleSearchFieldChange('requestHeaders')}
+              />
+              <span>Request Headers</span>
+            </label>
+            <label className="search-option">
+              <input
+                type="checkbox"
+                checked={searchOptions.fields.requestBody}
+                onChange={() => handleSearchFieldChange('requestBody')}
+              />
+              <span>Request Body</span>
+            </label>
+            <label className="search-option">
+              <input
+                type="checkbox"
+                checked={searchOptions.fields.responseHeaders}
+                onChange={() => handleSearchFieldChange('responseHeaders')}
+              />
+              <span>Response Headers</span>
+            </label>
+            <label className="search-option">
+              <input
+                type="checkbox"
+                checked={searchOptions.fields.responseBody}
+                onChange={() => handleSearchFieldChange('responseBody')}
+              />
+              <span>Response Body</span>
+            </label>
           </div>
         </div>
       </header>

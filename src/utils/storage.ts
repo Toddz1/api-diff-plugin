@@ -235,6 +235,9 @@ class StorageManager {
     });
   }
 
+  /**
+   * 获取会话的请求列表，支持分页和搜索
+   */
   async getSessionRequests(
     sessionId: string,
     pagination?: PaginationOptions,
@@ -278,35 +281,76 @@ class StorageManager {
           });
         }
         
-        // 默认按时间戳降序排序，最新的请求在前面
-        requests = requests.sort((a, b) => b.timestamp - a.timestamp);
-        
-        // 应用搜索过滤
-        if (searchOptions?.query) {
+        // 如果有搜索选项，筛选请求
+        let filteredRequests = requests;
+        if (searchOptions && searchOptions.query) {
           const query = searchOptions.query.toLowerCase();
           const fields = searchOptions.fields;
           
-          // 使用更高效的过滤
-          requests = requests.filter(request => {
-            // 先检查最简单的路径
-            if (fields.url && request.url.toLowerCase().includes(query)) return true;
-            
-            // 然后检查其他字段
-            try {
-              if (fields.requestHeaders && JSON.stringify(request.requestHeaders || {}).toLowerCase().includes(query)) return true;
-              if (fields.requestBody && request.requestBody && JSON.stringify(request.requestBody).toLowerCase().includes(query)) return true;
-              if (fields.responseHeaders && request.responseHeaders && JSON.stringify(request.responseHeaders).toLowerCase().includes(query)) return true;
-              if (fields.responseBody && request.response && JSON.stringify(request.response).toLowerCase().includes(query)) return true;
-            } catch (e) {
-              // 忽略序列化错误
-              console.error('StorageManager: Error during search filtering', e);
+          filteredRequests = requests.filter(request => {
+            // 检查 URL
+            if (fields.url && request.url.toLowerCase().includes(query)) {
+              return true;
             }
+            
+            // 增强: 检查 request_id (允许搜索部分ID)
+            if (fields.id && request.id) {
+              // 确保字符串比较并转为小写
+              const requestId = String(request.id).toLowerCase();
+              // 检查是否包含查询字符串(不区分位置)
+              if (requestId.includes(query)) {
+                return true;
+              }
+              
+              // 尝试处理带有下划线的ID格式 (如"1743197454735_zd0q6b")
+              const idParts = requestId.split('_');
+              for (const part of idParts) {
+                if (part.includes(query)) {
+                  return true;
+                }
+              }
+            }
+            
+            // 检查请求头
+            if (fields.requestHeaders && request.requestHeaders) {
+              const headersStr = JSON.stringify(request.requestHeaders).toLowerCase();
+              if (headersStr.includes(query)) {
+                return true;
+              }
+            }
+            
+            // 检查请求体
+            if (fields.requestBody && request.requestBody) {
+              const bodyStr = typeof request.requestBody === 'string' 
+                ? request.requestBody.toLowerCase() 
+                : JSON.stringify(request.requestBody).toLowerCase();
+              if (bodyStr.includes(query)) {
+                return true;
+              }
+            }
+            
+            // 检查响应头
+            if (fields.responseHeaders && request.responseHeaders) {
+              const headersStr = JSON.stringify(request.responseHeaders).toLowerCase();
+              if (headersStr.includes(query)) {
+                return true;
+              }
+            }
+            
+            // 检查响应体
+            if (fields.responseBody && request.response && request.response.body) {
+              const bodyStr = typeof request.response.body === 'string' 
+                ? request.response.body.toLowerCase() 
+                : JSON.stringify(request.response.body).toLowerCase();
+              if (bodyStr.includes(query)) {
+                return true;
+              }
+            }
+            
             return false;
           });
-          
-          console.log(`StorageManager: After search filter, ${requests.length} requests remain`);
         }
-
+        
         // 应用分页
         if (pagination) {
           // 确保分页参数有效
@@ -317,15 +361,15 @@ class StorageManager {
           const end = start + pageSize;
           
           // 优化内存使用，仅返回需要的子集
-          const pagedRequests = (start < requests.length) ? 
-            requests.slice(start, Math.min(end, requests.length)) : 
+          const pagedRequests = (start < filteredRequests.length) ? 
+            filteredRequests.slice(start, Math.min(end, filteredRequests.length)) : 
             [];
             
           console.log(`StorageManager: After pagination, returning ${pagedRequests.length} requests (page ${page}, pageSize ${pageSize})`);
           return pagedRequests;
         }
 
-        return requests;
+        return filteredRequests;
       } catch (error) {
         console.error('StorageManager: Error in getSessionRequests:', error);
         return [];
