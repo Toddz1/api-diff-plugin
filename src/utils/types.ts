@@ -13,6 +13,7 @@ export interface RequestData {
 
 export interface ModifiedRequestData extends Partial<RequestData> {
   shouldResend?: boolean;
+  shouldSaveRequest?: boolean;
 }
 
 export interface CaptureSession {

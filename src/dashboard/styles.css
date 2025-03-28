@@ -1058,4 +1058,69 @@ body {
   font-family: monospace;
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+/* Diff结果页面样式 */
+.diff-result-modal .modal-content {
+  width: 90%;
+  max-width: 1200px;
+  height: 90%;
+  max-height: 800px;
+}
+
+.diff-result-modal .modal-body {
+  padding: 0;
+  overflow: auto;
+}
+
+.diff-item {
+  margin: 15px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.diff-item h4 {
+  margin: 0;
+  padding: 10px;
+  background: #f9f9f9;
+}
+
+.diff-content {
+  display: flex;
+  flex-direction: row;
+}
+
+.diff-original, 
+.diff-modified {
+  flex: 1;
+  padding: 10px;
+  overflow: auto;
+}
+
+.diff-original {
+  background: #fff8f8;
+  border-right: 1px solid #ddd;
+}
+
+.diff-modified {
+  background: #f8fff8;
+}
+
+.diff-added {
+  background-color: #e6ffed;
+}
+
+.diff-removed {
+  background-color: #ffeef0;
+}
+
+/* Diff结果中的pre标签样式 */
+.diff-content pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.5;
 } 
