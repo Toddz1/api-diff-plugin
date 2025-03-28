@@ -5,6 +5,7 @@
   "description": "A Chrome extension for API request capturing and diffing",
   "permissions": [
     "webRequest",
+    "webRequestBlocking",
     "storage",
     "tabs",
     "activeTab"

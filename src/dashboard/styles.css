@@ -269,10 +269,22 @@ body {
   flex: 1;
 }
 
-.request-timestamp {
-  font-size: 0.8rem;
-  color: #666;
+.request-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   margin-bottom: 1rem;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.request-timestamp {
+  color: #666;
+}
+
+.request-id {
+  color: #666;
+  font-family: monospace;
 }
 
 .request-details {

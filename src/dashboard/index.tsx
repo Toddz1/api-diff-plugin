@@ -302,8 +302,13 @@ const Dashboard: React.FC = () => {
                           {request.url}
                         </span>
                       </div>
-                      <div className="request-timestamp">
-                        {formatTimestamp(request.timestamp)}
+                      <div className="request-info">
+                        <span className="request-timestamp">
+                          {formatTimestamp(request.timestamp)}
+                        </span>
+                        <span className="request-id">
+                          request_id: {request.id}
+                        </span>
                       </div>
                       <div className="request-details">
                         <h3>Request Headers</h3>
