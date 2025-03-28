@@ -16,7 +16,7 @@ const DEFAULT_SEARCH_OPTIONS: SearchOptions = {
 };
 
 const DEFAULT_PAGINATION: PaginationOptions = {
-  pageSize: 50,
+  pageSize: 10,
   page: 0
 };
 
@@ -471,11 +471,18 @@ const RequestItem: React.FC<{
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDiffModal, setShowDiffModal] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
-
-  // 获取状态码，如果有的话
-  const statusCode = request.response?.status || '';
-  // 请求耗时
+  
+  // 获取HTTP状态码
+  const statusCode = request.response?.status;
+  
+  // 获取请求耗时
   const duration = request.duration;
+  
+  // 调试日志
+  useEffect(() => {
+    console.log(`RequestItem: Request ${request.id} with duration:`, duration);
+    console.log(`RequestItem: Full request object:`, request);
+  }, [request]);
 
   return (
     <div className="request-item">
@@ -500,9 +507,6 @@ const RequestItem: React.FC<{
           <span className="url" title={request.url}>
             {request.url}
           </span>
-          {displayOptions.duration && duration !== undefined && (
-            <span className="duration">{duration}ms</span>
-          )}
         </div>
         <div className="request-actions">
           <button 
@@ -533,7 +537,7 @@ const RequestItem: React.FC<{
           {new Date(request.timestamp).toLocaleString()}
         </span>
         <span className="request-id">
-          request_id: {request.id}
+          duration: {duration !== undefined ? `${duration}ms` : '--ms'}    request_id: {request.id}
         </span>
       </div>
       {isExpanded && (

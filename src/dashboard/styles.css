@@ -207,6 +207,11 @@ body {
   color: #666;
 }
 
+.session-id strong {
+  color: #333;
+  font-weight: bold;
+}
+
 .session-status {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
@@ -372,12 +377,14 @@ body {
 
 .duration {
   font-size: 0.75rem;
-  color: #666;
-  background-color: #f5f5f5;
-  padding: 0.15rem 0.3rem;
+  color: #333;
+  background-color: #e6f7ff;
+  padding: 0.15rem 0.5rem;
   border-radius: 3px;
   margin-left: auto;
   font-family: monospace;
+  border: 1px solid #91d5ff;
+  font-weight: bold;
 }
 
 .request-actions {
@@ -503,15 +510,27 @@ body {
   white-space: nowrap;
   flex: 1;
   font-size: 0.875rem;
+  max-width: 50%;
 }
 
 .request-timestamp {
   color: #666;
 }
 
+.request-duration {
+  color: #333;
+  font-family: monospace;
+  font-weight: 500;
+}
+
 .request-id {
   color: #666;
   font-family: monospace;
+}
+
+.request-id strong {
+  color: #333;
+  font-weight: bold;
 }
 
 .no-session-selected {

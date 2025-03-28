@@ -352,8 +352,11 @@ class StorageManager {
             requestHeaders: request.requestHeaders || {},
             requestBody: request.requestBody,
             responseHeaders: request.responseHeaders || {},
-            response: request.response
+            response: request.response,
+            duration: request.duration !== undefined ? Number(request.duration) : undefined
           };
+          
+          console.log(`StorageManager: Saving request ${safeRequest.id} with duration: ${safeRequest.duration}`);
           
           // 确保 JSON 可以序列化
           try {

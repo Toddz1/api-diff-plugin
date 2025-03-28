@@ -369,14 +369,10 @@ chrome.webRequest.onCompleted.addListener(
       // 计算请求完成时间
       const completionTime = Date.now() - request.timestamp;
       
-      // 对于长时间运行的请求，更新时间戳
-      if (completionTime > 10000) { // 10秒以上的请求
-        request.timestamp = Date.now();
-      }
-      
-      // 记录请求耗时
+      // 记录请求耗时 - 确保设置为数字，而不是undefined
       request.duration = completionTime;
-
+      console.log(`Background: Request ${request.id} completed in ${completionTime}ms`);
+      
       // 检查是否为Diff请求
       const isDiffRequest = request.requestHeaders && 
                            (request.requestHeaders['X-API-Diff-Request'] === '1' ||
@@ -447,6 +443,11 @@ chrome.webRequest.onCompleted.addListener(
           error: `Failed to capture: ${error.message || 'Unknown error'}`
         };
         
+        // 确保duration被设置
+        if (request.duration === undefined) {
+          request.duration = Date.now() - request.timestamp;
+        }
+        
         // 如果不是Diff请求，仍然保存
         if (!isDiffRequest) {
           queueRequestForSaving(request);
@@ -454,6 +455,11 @@ chrome.webRequest.onCompleted.addListener(
       }
     } catch (error: any) {
       console.error('Failed to capture response:', error);
+      
+      // 确保duration被设置
+      if (request.duration === undefined) {
+        request.duration = Date.now() - request.timestamp;
+      }
       
       // 保存错误信息
       request.response = {
