@@ -537,7 +537,10 @@ const RequestItem: React.FC<{
           {new Date(request.timestamp).toLocaleString()}
         </span>
         <span className="request-id">
-          duration: {duration !== undefined ? `${duration}ms` : '--ms'}    request_id: {request.id}
+          {displayOptions.duration ? 
+            `duration: ${duration !== undefined ? `${duration}ms` : '--ms'}    ` : 
+            ''}
+          request_id: {request.id}
         </span>
       </div>
       {isExpanded && (
