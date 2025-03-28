@@ -505,7 +505,14 @@ const RequestItem: React.FC<{
             {request.method}{statusCode && <span className="status-code">{` ${statusCode}`}</span>}
           </span>
           <span className="url" title={request.url}>
-            {request.url}
+            {(() => {
+              try {
+                const url = new URL(request.url);
+                return url.pathname + url.search;
+              } catch (e) {
+                return request.url;
+              }
+            })()}
           </span>
         </div>
         <div className="request-actions">
@@ -536,11 +543,19 @@ const RequestItem: React.FC<{
         <span className="request-timestamp">
           {new Date(request.timestamp).toLocaleString()}
         </span>
+        {(() => {
+          try {
+            const url = new URL(request.url);
+            return <span className="request-domain">{url.protocol}//{url.hostname}</span>;
+          } catch (e) {
+            return null;
+          }
+        })()}
         <span className="request-id">
           {displayOptions.duration ? 
-            `duration: ${duration !== undefined ? `${duration}ms` : '--ms'}    ` : 
+            `duration:${duration !== undefined ? `${duration}ms` : '--ms'} ` : 
             ''}
-          request_id: {request.id}
+          request_id:{request.id}
         </span>
       </div>
       {isExpanded && (
