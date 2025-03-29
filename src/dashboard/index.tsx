@@ -23,12 +23,23 @@ const DEFAULT_PAGINATION: PaginationOptions = {
   page: 0
 };
 
-const DEFAULT_DISPLAY_OPTIONS = {
+// 声明显示选项的类型
+interface DisplayOptions {
+  requestHeaders: boolean;
+  requestBody: boolean;
+  responseHeaders: boolean;
+  responseBody: boolean;
+  duration: boolean;
+  diffStyle: 'side-by-side' | 'line-by-line';
+}
+
+const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   requestHeaders: false,
   requestBody: false,
   responseHeaders: false,
   responseBody: true,
-  duration: true // 默认显示耗时
+  duration: true, // 默认显示耗时
+  diffStyle: 'side-by-side' // 默认比较样式，可选 'side-by-side', 'line-by-line'
 };
 
 // 复制到剪贴板函数
@@ -496,8 +507,7 @@ const generateProfessionalDiff = (
   oldStr: string, 
   newStr: string, 
   filename: string,
-  outputFormat: 'side-by-side' | 'line-by-line' = 'side-by-side',
-  diffStyle: 'word' | 'char' | 'none' = 'word'
+  displayOptions: DisplayOptions
 ): string => {
   // 创建差异补丁
   const diffStr = Diff.createPatch(filename, oldStr, newStr, '原始内容', '修改后内容');
@@ -506,11 +516,11 @@ const generateProfessionalDiff = (
   const diffHtmlOptions: Diff2HtmlConfig = {
     drawFileList: false,
     matching: 'lines',
-    outputFormat: outputFormat as any, // 使用类型断言解决类型问题
+    outputFormat: displayOptions.diffStyle, // 使用用户选择的样式
     renderNothingWhenEmpty: false,
     matchingMaxComparisons: 2500,
     maxLineSizeInBlockForComparison: 200,
-    diffStyle: diffStyle as any // 使用类型断言解决类型问题
+    diffStyle: 'word' // 默认对比单词
   };
   
   // 生成HTML
@@ -522,7 +532,7 @@ const generateProfessionalDiff = (
 // 修改 RequestItem 组件
 const RequestItem: React.FC<{ 
   request: RequestData; 
-  displayOptions: typeof DEFAULT_DISPLAY_OPTIONS;
+  displayOptions: DisplayOptions;
   onSendModifiedRequest?: (originalRequest: RequestData, modifiedRequest: ModifiedRequestData) => Promise<void>;
   isSelected?: boolean;
   onCheckboxChange?: (requestId: string, checked: boolean) => void;
@@ -1152,362 +1162,50 @@ const Dashboard: React.FC = () => {
             }
           };
 
-          // 在新窗口中打开diff结果，并支持样式选择
-          const diffWindow = window.open('', '_blank', 'width=1200,height=800');
-          if (diffWindow) {
-            // 创建基本的HTML结构
-            diffWindow.document.write(`
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <title>API Diff 结果比较</title>
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css">
-                <style>
-                  body { 
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                    margin: 0; 
-                    padding: 20px;
-                    font-size: 14px;
-                    line-height: 1.5;
-                    color: #333;
-                  }
-                  .diff-container { 
-                    max-width: 100%; 
-                    margin: 0 auto; 
-                  }
-                  .diff-header { 
-                    padding: 15px 20px; 
-                    background: #f5f5f5; 
-                    border: 1px solid #ddd;
-                    border-radius: 4px 4px 0 0;
-                    margin-bottom: 20px;
-                  }
-                  .diff-title { 
-                    margin: 0 0 10px 0; 
-                    color: #333; 
-                    font-size: 20px;
-                    font-weight: 600;
-                  }
-                  .diff-metadata {
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 13px;
-                    color: #555;
-                  }
-                  .diff-controls {
-                    display: flex;
-                    justify-content: flex-end;
-                    align-items: center;
-                    margin-top: 10px;
-                    gap: 15px;
-                  }
-                  .diff-control-group {
-                    display: flex;
-                    align-items: center;
-                    gap: 5px;
-                  }
-                  .diff-control-label {
-                    font-size: 13px;
-                    font-weight: 500;
-                    color: #555;
-                  }
-                  .diff-control-select {
-                    padding: 4px 8px;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    background: white;
-                    font-size: 13px;
-                  }
-                  .diff-section { 
-                    margin: 30px 0;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    overflow: hidden;
-                  }
-                  .diff-section-header {
-                    padding: 12px 20px;
-                    background: #f9f9f9;
-                    border-bottom: 1px solid #ddd;
-                    font-weight: 600;
-                    font-size: 16px;
-                    color: #333;
-                  }
-                  .diff-item { 
-                    margin: 0; 
-                    border-bottom: 1px solid #ddd;
-                  }
-                  .diff-item:last-child {
-                    border-bottom: none;
-                  }
-                  .diff-item-header { 
-                    padding: 10px 20px; 
-                    background: #f9f9f9; 
-                    border-bottom: 1px solid #ddd;
-                    font-weight: 500;
-                    font-size: 14px;
-                  }
+          // 添加时间戳信息
+          const dataToSend = {
+            ...diffData,
+            originalTime: originalRequest.timestamp,
+            modifiedTime: newRequest.timestamp,
+          };
 
-                  /* Customize diff2html styles */
-                  .d2h-wrapper {
-                    margin: 0;
-                    padding: 0;
-                  }
-                  .d2h-file-header {
-                    display: none;
-                  }
-                  .d2h-file-diff {
-                    overflow-x: auto;
-                    overflow-y: hidden;
-                  }
-                  .d2h-code-line {
-                    white-space: pre;
-                  }
-                  .d2h-code-side-line {
-                    padding: 0 0.5em;
-                  }
-                  
-                  .return-button { 
-                    display: block;
-                    margin: 20px auto;
-                    padding: 10px 20px; 
-                    background: #4285f4; 
-                    color: white; 
-                    border: none; 
-                    border-radius: 4px; 
-                    cursor: pointer; 
-                    font-size: 14px;
-                  }
-                  .return-button:hover { 
-                    background: #3367d6; 
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="diff-container">
-                  <div class="diff-header">
-                    <h1 class="diff-title">API Diff 结果比较</h1>
-                    <div class="diff-metadata">
-                      <div>原始请求时间: ${new Date(originalRequest.timestamp).toLocaleString()}</div>
-                      <div>修改后请求时间: ${new Date(newRequest.timestamp).toLocaleString()}</div>
-                    </div>
-                    <div class="diff-controls">
-                      <div class="diff-control-group">
-                        <span class="diff-control-label">显示方式:</span>
-                        <select id="outputFormat" class="diff-control-select">
-                          <option value="side-by-side" selected>左右对比</option>
-                          <option value="line-by-line">行内对比</option>
-                        </select>
-                      </div>
-                      <div class="diff-control-group">
-                        <span class="diff-control-label">差异粒度:</span>
-                        <select id="diffStyle" class="diff-control-select">
-                          <option value="word" selected>单词</option>
-                          <option value="char">字符</option>
-                          <option value="none">行</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-            `);
+          console.log('Preparing modified request diff data:', dataToSend);
+
+          try {
+            // 将数据存储到 localStorage (处理大数据)
+            localStorage.setItem('api-diff-data', JSON.stringify(dataToSend));
+            console.log('Data saved to localStorage');
             
-            // 添加请求变更部分
-            diffWindow.document.write(`
-              <div class="diff-section">
-                <div class="diff-section-header">请求变更</div>
-            `);
+            // 打开无参数的差异查看器页面
+            const diffViewerUrl = chrome.runtime.getURL('diff-viewer.html');
+            console.log('Opening diff viewer URL:', diffViewerUrl);
             
-            // URL变更
-            if (diffData.requestDiff.url) {
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">URL</div>
-                  <div id="request-url" class="diff-content">
-                    ${generateProfessionalDiff(
-                      diffData.requestDiff.url.old, 
-                      diffData.requestDiff.url.new,
-                      'url.txt'
-                    )}
-                  </div>
-                </div>
-              `);
+            // 打开新窗口
+            const diffWindow = window.open(diffViewerUrl, '_blank', 'width=1200,height=800');
+            
+            if (!diffWindow) {
+              console.error('Failed to open diff window');
+              throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
             }
+          } catch (storageError) {
+            console.error('Failed to save data to localStorage, falling back to URL params', storageError);
             
-            // Method变更
-            if (diffData.requestDiff.method) {
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">Method</div>
-                  <div id="request-method" class="diff-content">
-                    ${generateProfessionalDiff(
-                      diffData.requestDiff.method.old, 
-                      diffData.requestDiff.method.new,
-                      'method.txt'
-                    )}
-                  </div>
-                </div>
-              `);
+            // 如果 localStorage 失败，回退到 URL 参数方式 (适用于较小数据)
+            const jsonData = JSON.stringify(dataToSend);
+            const dataParam = encodeURIComponent(jsonData);
+            console.log('Data encoded for URL, length:', dataParam.length);
+            
+            // 获取完整 URL
+            const diffViewerUrl = chrome.runtime.getURL('diff-viewer.html') + '?data=' + dataParam;
+            console.log('Opening diff viewer URL with params');
+            
+            // 打开新窗口
+            const diffWindow = window.open(diffViewerUrl, '_blank', 'width=1200,height=800');
+            
+            if (!diffWindow) {
+              console.error('Failed to open diff window');
+              throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
             }
-            
-            // Headers变更
-            if (diffData.requestDiff.headers) {
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">Request Headers</div>
-                  <div id="request-headers" class="diff-content">
-                    ${generateProfessionalDiff(
-                      JSON.stringify(diffData.requestDiff.headers.old, null, 2), 
-                      JSON.stringify(diffData.requestDiff.headers.new, null, 2),
-                      'request-headers.json'
-                    )}
-                  </div>
-                </div>
-              `);
-            }
-            
-            // Body变更
-            if (diffData.requestDiff.body) {
-              const oldBody = typeof diffData.requestDiff.body.old === 'string' 
-                ? diffData.requestDiff.body.old 
-                : JSON.stringify(diffData.requestDiff.body.old, null, 2);
-              const newBody = typeof diffData.requestDiff.body.new === 'string'
-                ? diffData.requestDiff.body.new
-                : JSON.stringify(diffData.requestDiff.body.new, null, 2);
-                
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">Request Body</div>
-                  <div id="request-body" class="diff-content">
-                    ${generateProfessionalDiff(oldBody, newBody, 'request-body.txt')}
-                  </div>
-                </div>
-              `);
-            }
-            
-            diffWindow.document.write(`</div>`); // 结束请求变更部分
-            
-            // 添加响应变更部分
-            diffWindow.document.write(`
-              <div class="diff-section">
-                <div class="diff-section-header">响应变更</div>
-            `);
-            
-            // Status变更
-            if (diffData.responseDiff.status) {
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">Status</div>
-                  <div id="response-status" class="diff-content">
-                    ${generateProfessionalDiff(
-                      String(diffData.responseDiff.status.old), 
-                      String(diffData.responseDiff.status.new),
-                      'status.txt'
-                    )}
-                  </div>
-                </div>
-              `);
-            }
-            
-            // Headers变更
-            if (diffData.responseDiff.headers) {
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">Response Headers</div>
-                  <div id="response-headers" class="diff-content">
-                    ${generateProfessionalDiff(
-                      JSON.stringify(diffData.responseDiff.headers.old, null, 2), 
-                      JSON.stringify(diffData.responseDiff.headers.new, null, 2),
-                      'response-headers.json'
-                    )}
-                  </div>
-                </div>
-              `);
-            }
-            
-            // Response Body变更
-            if (diffData.responseDiff.body) {
-              const oldBody = typeof diffData.responseDiff.body.old === 'string' 
-                ? diffData.responseDiff.body.old 
-                : JSON.stringify(diffData.responseDiff.body.old, null, 2);
-              const newBody = typeof diffData.responseDiff.body.new === 'string'
-                ? diffData.responseDiff.body.new
-                : JSON.stringify(diffData.responseDiff.body.new, null, 2);
-                
-              diffWindow.document.write(`
-                <div class="diff-item">
-                  <div class="diff-item-header">Response Body</div>
-                  <div id="response-body" class="diff-content">
-                    ${generateProfessionalDiff(oldBody, newBody, 'response-body.txt')}
-                  </div>
-                </div>
-              `);
-            }
-            
-            // 添加JavaScript代码来处理样式切换
-            diffWindow.document.write(`
-                </div><!-- 结束响应变更部分 -->
-                <button class="return-button" onclick="window.close()">关闭窗口</button>
-              </div><!-- 结束diff-container -->
-              
-              <script>
-                // 处理样式变更
-                function handleStyleChange() {
-                  const outputFormat = document.getElementById('outputFormat').value;
-                  const diffStyle = document.getElementById('diffStyle').value;
-                  
-                  // 加载必要的库
-                  if (!window.Diff || !window.Diff2Html) {
-                    // 加载Diff库
-                    const diffScript = document.createElement('script');
-                    diffScript.src = 'https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js';
-                    document.head.appendChild(diffScript);
-                    
-                    // 加载Diff2Html库
-                    const diff2htmlScript = document.createElement('script');
-                    diff2htmlScript.src = 'https://cdn.jsdelivr.net/npm/diff2html@3.4.35/bundles/js/diff2html.min.js';
-                    document.head.appendChild(diff2htmlScript);
-                    
-                    // 库加载完成后重新生成diff
-                    diff2htmlScript.onload = function() {
-                      regenerateAllDiffs();
-                    };
-                  } else {
-                    // 如果库已加载，直接重新生成diff
-                    regenerateAllDiffs();
-                  }
-                  
-                  // 重新生成所有差异内容
-                  function regenerateAllDiffs() {
-                    // 获取所有差异容器
-                    const diffContainers = [
-                      "request-url", "request-method", "request-headers", "request-body",
-                      "response-status", "response-headers", "response-body"
-                    ];
-                    
-                    // 对每个存在的容器重新生成差异
-                    diffContainers.forEach(id => {
-                      const container = document.getElementById(id);
-                      if (container) {
-                        // 获取原始内容（通过自定义属性或从DOM中解析）
-                        // 简单处理：重新加载页面以应用新样式
-                        window.location.reload();
-                      }
-                    });
-                  }
-                }
-                
-                // 绑定事件监听器
-                document.getElementById('outputFormat').addEventListener('change', handleStyleChange);
-                document.getElementById('diffStyle').addEventListener('change', handleStyleChange);
-              </script>
-            </body>
-            </html>
-            `);
-            
-            diffWindow.document.close();
-          } else {
-            // 如果新窗口打开失败，使用alert提示
-            console.error('Failed to open diff window, popup might be blocked');
-            alert('无法打开比较窗口，请检查您的浏览器是否阻止了弹出窗口。');
           }
         }
       }
@@ -1716,6 +1414,8 @@ const Dashboard: React.FC = () => {
         throw new Error('无法找到选中的请求');
       }
 
+      console.log('Comparing requests:', request1.id, request2.id);
+
       // 使用DiffResult类型定义差异数据
       let diffData: DiffResult = {
         requestDiff: {
@@ -1736,361 +1436,50 @@ const Dashboard: React.FC = () => {
         }
       };
 
-      // 在新窗口中打开diff结果
-      const diffWindow = window.open('', '_blank', 'width=1200,height=800');
-      if (diffWindow) {
-        // 创建基本的HTML结构
-        diffWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>API 请求对比</title>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css">
-            <style>
-              body { 
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                margin: 0; 
-                padding: 20px;
-                font-size: 14px;
-                line-height: 1.5;
-                color: #333;
-              }
-              .diff-container { 
-                max-width: 100%; 
-                margin: 0 auto; 
-              }
-              .diff-header { 
-                padding: 15px 20px; 
-                background: #f5f5f5; 
-                border: 1px solid #ddd;
-                border-radius: 4px 4px 0 0;
-                margin-bottom: 20px;
-              }
-              .diff-title { 
-                margin: 0 0 10px 0; 
-                color: #333; 
-                font-size: 20px;
-                font-weight: 600;
-              }
-              .diff-metadata {
-                display: flex;
-                justify-content: space-between;
-                font-size: 13px;
-                color: #555;
-              }
-              .diff-controls {
-                display: flex;
-                justify-content: flex-end;
-                align-items: center;
-                margin-top: 10px;
-                gap: 15px;
-              }
-              .diff-control-group {
-                display: flex;
-                align-items: center;
-                gap: 5px;
-              }
-              .diff-control-label {
-                font-size: 13px;
-                font-weight: 500;
-                color: #555;
-              }
-              .diff-control-select {
-                padding: 4px 8px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                background: white;
-                font-size: 13px;
-              }
-              .diff-section { 
-                margin: 30px 0;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                overflow: hidden;
-              }
-              .diff-section-header {
-                padding: 12px 20px;
-                background: #f9f9f9;
-                border-bottom: 1px solid #ddd;
-                font-weight: 600;
-                font-size: 16px;
-                color: #333;
-              }
-              .diff-item { 
-                margin: 0; 
-                border-bottom: 1px solid #ddd;
-              }
-              .diff-item:last-child {
-                border-bottom: none;
-              }
-              .diff-item-header { 
-                padding: 10px 20px; 
-                background: #f9f9f9; 
-                border-bottom: 1px solid #ddd;
-                font-weight: 500;
-                font-size: 14px;
-              }
-              /* Customize diff2html styles */
-              .d2h-wrapper {
-                margin: 0;
-                padding: 0;
-              }
-              .d2h-file-header {
-                display: none;
-              }
-              .d2h-file-diff {
-                overflow-x: auto;
-                overflow-y: hidden;
-              }
-              .d2h-code-line {
-                white-space: pre;
-              }
-              .d2h-code-side-line {
-                padding: 0 0.5em;
-              }
-              
-              .return-button { 
-                display: block;
-                margin: 20px auto;
-                padding: 10px 20px; 
-                background: #4285f4; 
-                color: white; 
-                border: none; 
-                border-radius: 4px; 
-                cursor: pointer; 
-                font-size: 14px;
-              }
-              .return-button:hover { 
-                background: #3367d6; 
-              }
-            </style>
-          </head>
-          <body>
-            <div class="diff-container">
-              <div class="diff-header">
-                <h1 class="diff-title">API 请求对比</h1>
-                <div class="diff-metadata">
-                  <div>请求1: ${new Date(request1.timestamp).toLocaleString()}</div>
-                  <div>请求2: ${new Date(request2.timestamp).toLocaleString()}</div>
-                </div>
-                <div class="diff-controls">
-                  <div class="diff-control-group">
-                    <span class="diff-control-label">显示方式:</span>
-                    <select id="outputFormat" class="diff-control-select">
-                      <option value="side-by-side" selected>左右对比</option>
-                      <option value="line-by-line">行内对比</option>
-                    </select>
-                  </div>
-                  <div class="diff-control-group">
-                    <span class="diff-control-label">差异粒度:</span>
-                    <select id="diffStyle" class="diff-control-select">
-                      <option value="word" selected>单词</option>
-                      <option value="char">字符</option>
-                      <option value="none">行</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-        `);
+      // 添加时间戳信息
+      const dataToSend = {
+        ...diffData,
+        request1Time: request1.timestamp,
+        request2Time: request2.timestamp,
+      };
+
+      console.log('Preparing data to send to diff viewer', dataToSend);
+
+      try {
+        // 将数据存储到 localStorage (处理大数据)
+        localStorage.setItem('api-diff-data', JSON.stringify(dataToSend));
+        console.log('Data saved to localStorage');
         
-        // 添加请求部分
-        diffWindow.document.write(`
-          <div class="diff-section">
-            <div class="diff-section-header">请求信息</div>
-        `);
+        // 打开无参数的差异查看器页面
+        const diffViewerUrl = chrome.runtime.getURL('diff-viewer.html');
+        console.log('Opening diff viewer URL:', diffViewerUrl);
         
-        // URL对比
-        if (diffData.requestDiff.url) {
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">URL</div>
-              <div id="request-url" class="diff-content">
-                ${generateProfessionalDiff(
-                  diffData.requestDiff.url.old, 
-                  diffData.requestDiff.url.new,
-                  'url.txt'
-                )}
-              </div>
-            </div>
-          `);
+        // 打开新窗口
+        const diffWindow = window.open(diffViewerUrl, '_blank', 'width=1200,height=800');
+        
+        if (!diffWindow) {
+          console.error('Failed to open diff window');
+          throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
         }
+      } catch (storageError) {
+        console.error('Failed to save data to localStorage, falling back to URL params', storageError);
         
-        // Method对比
-        if (diffData.requestDiff.method) {
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">Method</div>
-              <div id="request-method" class="diff-content">
-                ${generateProfessionalDiff(
-                  diffData.requestDiff.method.old, 
-                  diffData.requestDiff.method.new,
-                  'method.txt'
-                )}
-              </div>
-            </div>
-          `);
+        // 如果 localStorage 失败，回退到 URL 参数方式 (适用于较小数据)
+        const jsonData = JSON.stringify(dataToSend);
+        const dataParam = encodeURIComponent(jsonData);
+        console.log('Data encoded for URL, length:', dataParam.length);
+        
+        // 获取完整 URL
+        const diffViewerUrl = chrome.runtime.getURL('diff-viewer.html') + '?data=' + dataParam;
+        console.log('Opening diff viewer URL with params');
+        
+        // 打开新窗口
+        const diffWindow = window.open(diffViewerUrl, '_blank', 'width=1200,height=800');
+        
+        if (!diffWindow) {
+          console.error('Failed to open diff window');
+          throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
         }
-        
-        // Headers对比
-        if (diffData.requestDiff.headers) {
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">Request Headers</div>
-              <div id="request-headers" class="diff-content">
-                ${generateProfessionalDiff(
-                  JSON.stringify(diffData.requestDiff.headers.old, null, 2), 
-                  JSON.stringify(diffData.requestDiff.headers.new, null, 2),
-                  'request-headers.json'
-                )}
-              </div>
-            </div>
-          `);
-        }
-        
-        // Body对比
-        if (diffData.requestDiff.body) {
-          const oldBody = typeof diffData.requestDiff.body.old === 'string' 
-            ? diffData.requestDiff.body.old 
-            : JSON.stringify(diffData.requestDiff.body.old, null, 2);
-          const newBody = typeof diffData.requestDiff.body.new === 'string'
-            ? diffData.requestDiff.body.new
-            : JSON.stringify(diffData.requestDiff.body.new, null, 2);
-            
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">Request Body</div>
-              <div id="request-body" class="diff-content">
-                ${generateProfessionalDiff(oldBody, newBody, 'request-body.txt')}
-              </div>
-            </div>
-          `);
-        }
-        
-        diffWindow.document.write(`</div>`); // 结束请求部分
-        
-        // 添加响应部分
-        diffWindow.document.write(`
-          <div class="diff-section">
-            <div class="diff-section-header">响应信息</div>
-        `);
-        
-        // Status对比
-        if (diffData.responseDiff.status) {
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">Status</div>
-              <div id="response-status" class="diff-content">
-                ${generateProfessionalDiff(
-                  String(diffData.responseDiff.status.old), 
-                  String(diffData.responseDiff.status.new),
-                  'status.txt'
-                )}
-              </div>
-            </div>
-          `);
-        }
-        
-        // Headers对比
-        if (diffData.responseDiff.headers) {
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">Response Headers</div>
-              <div id="response-headers" class="diff-content">
-                ${generateProfessionalDiff(
-                  JSON.stringify(diffData.responseDiff.headers.old, null, 2), 
-                  JSON.stringify(diffData.responseDiff.headers.new, null, 2),
-                  'response-headers.json'
-                )}
-              </div>
-            </div>
-          `);
-        }
-        
-        // Response Body对比
-        if (diffData.responseDiff.body) {
-          const oldBody = typeof diffData.responseDiff.body.old === 'string' 
-            ? diffData.responseDiff.body.old 
-            : JSON.stringify(diffData.responseDiff.body.old, null, 2);
-          const newBody = typeof diffData.responseDiff.body.new === 'string'
-            ? diffData.responseDiff.body.new
-            : JSON.stringify(diffData.responseDiff.body.new, null, 2);
-            
-          diffWindow.document.write(`
-            <div class="diff-item">
-              <div class="diff-item-header">Response Body</div>
-              <div id="response-body" class="diff-content">
-                ${generateProfessionalDiff(oldBody, newBody, 'response-body.txt')}
-              </div>
-            </div>
-          `);
-        }
-        
-        // 添加JavaScript代码来处理样式切换
-        diffWindow.document.write(`
-            </div><!-- 结束响应部分 -->
-            <button class="return-button" onclick="window.close()">关闭窗口</button>
-          </div><!-- 结束diff-container -->
-          
-          <script>
-            // 处理样式变更
-            function handleStyleChange() {
-              const outputFormat = document.getElementById('outputFormat').value;
-              const diffStyle = document.getElementById('diffStyle').value;
-              
-              // 加载必要的库
-              if (!window.Diff || !window.Diff2Html) {
-                // 加载Diff库
-                const diffScript = document.createElement('script');
-                diffScript.src = 'https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js';
-                document.head.appendChild(diffScript);
-                
-                // 加载Diff2Html库
-                const diff2htmlScript = document.createElement('script');
-                diff2htmlScript.src = 'https://cdn.jsdelivr.net/npm/diff2html@3.4.35/bundles/js/diff2html.min.js';
-                document.head.appendChild(diff2htmlScript);
-                
-                // 库加载完成后重新生成diff
-                diff2htmlScript.onload = function() {
-                  regenerateAllDiffs();
-                };
-              } else {
-                // 如果库已加载，直接重新生成diff
-                regenerateAllDiffs();
-              }
-              
-              // 重新生成所有差异内容
-              function regenerateAllDiffs() {
-                // 获取所有差异容器
-                const diffContainers = [
-                  "request-url", "request-method", "request-headers", "request-body",
-                  "response-status", "response-headers", "response-body"
-                ];
-                
-                // 对每个存在的容器重新生成差异
-                diffContainers.forEach(id => {
-                  const container = document.getElementById(id);
-                  if (container) {
-                    // 获取原始内容（通过自定义属性或从DOM中解析）
-                    // 简单处理：重新加载页面以应用新样式
-                    window.location.reload();
-                  }
-                });
-              }
-            }
-            
-            // 绑定事件监听器
-            document.getElementById('outputFormat').addEventListener('change', handleStyleChange);
-            document.getElementById('diffStyle').addEventListener('change', handleStyleChange);
-          </script>
-        </body>
-        </html>
-        `);
-        
-        diffWindow.document.close();
-      } else {
-        // 如果新窗口打开失败，使用alert提示
-        console.error('Failed to open diff window, popup might be blocked');
-        alert('无法打开比较窗口，请检查您的浏览器是否阻止了弹出窗口。');
       }
     } catch (error) {
       console.error('Failed to compare requests:', error);
@@ -2356,11 +1745,32 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="display-options">
                   <span>Display sections: </span>
-                  {Object.entries(displayOptions).map(([key, value]) => (
+                  {Object.entries(displayOptions).map(([key, value]) => {
+                    // 差异样式使用下拉选择器
+                    if (key === 'diffStyle') {
+                      return (
+                        <div key={key} className="diff-style-selector">
+                          <label>Diff Style:</label>
+                          <select 
+                            value={value as string}
+                            onChange={e => setDisplayOptions(prev => ({
+                              ...prev,
+                              diffStyle: e.target.value as 'side-by-side' | 'line-by-line'
+                            }))}
+                          >
+                            <option value="side-by-side">Side by Side</option>
+                            <option value="line-by-line">Line by Line</option>
+                          </select>
+                        </div>
+                      );
+                    }
+                    
+                    // 其他选项使用复选框
+                    return (
                     <label key={key}>
                       <input
                         type="checkbox"
-                        checked={value}
+                          checked={value as boolean}
                         onChange={e => setDisplayOptions(prev => ({
                           ...prev,
                           [key]: e.target.checked
@@ -2368,7 +1778,8 @@ const Dashboard: React.FC = () => {
                       />
                       {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

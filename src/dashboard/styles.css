@@ -378,6 +378,39 @@ body {
   margin: 0;
 }
 
+/* 差异样式选择器 */
+.diff-style-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.diff-style-selector label {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.diff-style-selector select {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.diff-style-selector select:hover {
+  border-color: #1976d2;
+}
+
+.diff-style-selector select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
 .requests-list {
   flex: 1;
   overflow-y: auto;
@@ -994,11 +1027,131 @@ body {
 
 .diff-content pre {
   margin: 0;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  overflow-x: auto;
   white-space: pre-wrap;
-  word-break: break-all;
-  font-family: monospace;
-  font-size: 0.75rem;
-  line-height: 1.4;
+  word-wrap: break-word;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.diff-content pre code {
+  display: block;
+  position: relative;
+  padding-left: 3.5rem;
+  counter-reset: line;
+}
+
+.diff-content pre code > span {
+  display: block;
+  position: relative;
+  padding-right: 1rem;
+}
+
+.diff-content pre code > span::before {
+  content: counter(line);
+  counter-increment: line;
+  position: absolute;
+  left: -3.5rem;
+  width: 2.5rem;
+  text-align: right;
+  color: #999;
+  user-select: none;
+}
+
+.diff-content .original,
+.diff-content .modified {
+  margin: 0;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.diff-content .original code,
+.diff-content .modified code {
+  display: block;
+  position: relative;
+  padding-left: 3.5rem;
+  counter-reset: line;
+}
+
+.diff-content .original code > span,
+.diff-content .modified code > span {
+  display: block;
+  position: relative;
+  padding-right: 1rem;
+}
+
+.diff-content .original code > span::before,
+.diff-content .modified code > span::before {
+  content: counter(line);
+  counter-increment: line;
+  position: absolute;
+  left: -3.5rem;
+  width: 2.5rem;
+  text-align: right;
+  color: #999;
+  user-select: none;
+}
+
+.diff-content .diff-added {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.diff-content .diff-removed {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.diff-content .diff-modified {
+  background-color: #fff3e0;
+  color: #ef6c00;
+}
+
+.diff-content pre,
+.diff-content .original,
+.diff-content .modified {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.diff-content pre::-webkit-scrollbar,
+.diff-content .original::-webkit-scrollbar,
+.diff-content .modified::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.diff-content pre::-webkit-scrollbar-track,
+.diff-content .original::-webkit-scrollbar-track,
+.diff-content .modified::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.diff-content pre::-webkit-scrollbar-thumb,
+.diff-content .original::-webkit-scrollbar-thumb,
+.diff-content .modified::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.diff-content pre::-webkit-scrollbar-thumb:hover,
+.diff-content .original::-webkit-scrollbar-thumb:hover,
+.diff-content .modified::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .modal-footer {
@@ -1212,4 +1365,288 @@ body {
 .compare-selected:disabled {
   background-color: #ccc;
   cursor: not-allowed;
-} 
+}
+
+/* 差异对比容器 */
+.diff-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 差异内容样式 */
+.diff-content {
+  position: relative;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* 代码块基础样式 */
+.diff-content pre {
+  margin: 0;
+  padding: 8px 8px 8px 60px !important; /* 为行号预留固定宽度 */
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative; /* 用于行号定位 */
+}
+
+/* 行号容器 */
+.diff-content .line-numbers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50px;
+  padding: 8px 0;
+  background-color: #f1f1f1;
+  border-right: 1px solid #ddd;
+  color: #999;
+  text-align: right;
+  user-select: none;
+}
+
+/* 行号样式 */
+.diff-content .line-number {
+  display: block;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 差异行样式 */
+.diff-content .diff-line {
+  display: block;
+  padding-left: 10px;
+  min-height: 1.5em;
+}
+
+/* 差异类型样式 */
+.diff-content .diff-added {
+  background-color: #e6ffe6;
+  border-left: 3px solid #52c41a;
+}
+
+.diff-content .diff-removed {
+  background-color: #ffe6e6;
+  border-left: 3px solid #ff4d4f;
+}
+
+.diff-content .diff-modified {
+  background-color: #fff7e6;
+  border-left: 3px solid #faad14;
+}
+
+/* 滚动条样式 */
+.diff-content pre::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.diff-content pre::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.diff-content pre::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.diff-content pre::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 确保内容不会被行号覆盖 */
+.diff-content .content {
+  margin-left: 50px; /* 与行号容器宽度相同 */
+  padding-left: 10px;
+}
+
+/* 分割线 */
+.diff-separator {
+  margin: 1rem 0;
+  border-top: 1px solid #eee;
+}
+
+/* 修改和原始内容的标题 */
+.diff-header {
+  padding: 8px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #eee;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 确保长 URL 和 headers 正确换行 */
+.diff-content .url-line,
+.diff-content .header-line {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* Customize diff2html styles - 完全重写 */
+.d2h-wrapper {
+  margin: 1rem 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* 修复文件头部样式 */
+.d2h-file-header {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px 4px 0 0;
+  padding: 8px;
+}
+
+/* 修复表格布局，由div构成而非表格 */
+.d2h-diff-table {
+  border-spacing: 0;
+  border-collapse: separate;
+}
+
+/* 每行的容器 */
+.d2h-code-side-line {
+  position: relative; 
+  display: flex !important;
+  width: 100%;
+  min-height: 22px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* 行号容器 - 固定宽度 */
+.d2h-code-side-linenumber {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50px; 
+  min-width: 50px;
+  background-color: #f8f9fa;
+  color: #999;
+  text-align: right;
+  padding: 0 8px !important;
+  border-right: 1px solid #eee;
+  z-index: 1;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+/* 修改标记容器 - 字母前缀 */
+.d2h-code-line-prefix {
+  position: absolute;
+  left: 50px;
+  width: 30px;
+  min-width: 30px;
+  padding: 0 8px;
+  text-align: center;
+  color: #999;
+  background-color: #f8f9fa;
+  border-right: 1px solid #eee;
+  z-index: 1;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+/* 内容容器 - 确保不会被覆盖 */
+.d2h-code-line-ctn {
+  position: relative;
+  margin-left: 80px !important; /* 行号(50px) + 标记(30px) */
+  padding: 0 8px !important;
+  min-height: 22px;
+  line-height: 22px;
+  word-break: break-all !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: break-word !important;
+  width: calc(100% - 80px) !important;
+  box-sizing: border-box;
+}
+
+/* 差异标记样式 */
+.d2h-ins {
+  background-color: #e6ffe6 !important;
+  border-left: 4px solid #52c41a !important;
+}
+
+.d2h-del {
+  background-color: #ffe6e6 !important;
+  border-left: 4px solid #ff4d4f !important;
+}
+
+.d2h-info {
+  background-color: #f8f9fa !important;
+  color: #999 !important;
+}
+
+/* 文件差异容器 */
+.d2h-file-diff {
+  border: 1px solid #e0e0e0;
+  border-radius: 0 0 4px 4px;
+  background: #fff;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+
+/* 代码字体和大小 */
+.d2h-code-line-ctn {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+/* 确保内联差异显示正确 */
+.d2h-code-line-ctn .d2h-del,
+.d2h-code-line-ctn .d2h-ins {
+  display: inline-block;
+  padding: 1px 3px;
+  border-radius: 2px;
+  text-decoration: none;
+  border-left: none !important;
+}
+
+.d2h-code-line-ctn .d2h-del {
+  background-color: #ffeef0;
+}
+
+.d2h-code-line-ctn .d2h-ins {
+  background-color: #e6ffed;
+}
+
+/* 优化URL和Headers的样式 */
+.d2h-code-line-ctn[data-content-type="url"],
+.d2h-code-line-ctn[data-content-type="header"] {
+  word-break: break-all !important;
+}
+
+/* 修复分隔符样式 */
+.d2h-file-side-diff {
+  display: block;
+  width: 100%;
+}
+
+/* 优化滚动条 */
+.d2h-file-wrapper {
+  overflow-x: auto;
+}
+
+/* 修复不同视图模式 */
+.d2h-file-wrapper.d2h-file-diff-view {
+  height: auto;
+}
+
+/* 提高特异性，确保样式被应用 */
+.dashboard .d2h-code-line-ctn {
+  margin-left: 80px !important;
+  width: calc(100% - 80px) !important;
+}
+
+/* 添加打包后的文件 */
+
+/* 添加打包后的文件 */ 

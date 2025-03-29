@@ -11,6 +11,7 @@
     "activeTab",
     "<all_urls>"
   ],
+  "content_security_policy": "script-src 'self' blob: filesystem: https://cdn.jsdelivr.net; object-src 'self'",
   "background": {
     "scripts": ["background.js"],
     "persistent": true
@@ -37,6 +38,8 @@
   "web_accessible_resources": [
     "dashboard.html",
     "dashboard.js",
-    "icons/*"
+    "icons/*",
+    "diff-viewer.js",
+    "diff-viewer.html"
   ]
 } 
