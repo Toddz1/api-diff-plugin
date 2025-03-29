@@ -88,74 +88,170 @@
       font-weight: 500;
       font-size: 14px;
     }
+
+    /* diff2html 样式覆盖 */
     .d2h-wrapper {
       margin: 0;
       padding: 0;
+      text-align: left;
     }
+    
     .d2h-file-header {
       display: none;
     }
-    .d2h-file-diff {
-      overflow-x: auto;
-      overflow-y: hidden;
-    }
-    .d2h-code-line {
-      white-space: pre-wrap;
-    }
-    .d2h-code-side-line {
-      padding: 0 0.5em;
-    }
-    .return-button { 
-      display: block;
-      margin: 20px auto;
-      padding: 10px 20px; 
-      background: #4285f4; 
-      color: white; 
-      border: none; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      font-size: 14px;
-    }
-    .return-button:hover { 
-      background: #3367d6; 
-    }
-
-    /* 修复行号覆盖内容问题 */
-    .d2h-code-side-linenumber, 
-    .d2h-code-linenumber {
-      position: absolute !important;
-      width: 35px !important;
-      min-width: 35px !important;
-      padding: 0 8px !important;
-      background-color: #f8f9fa !important;
-      text-align: right !important;
-      border-right: 1px solid #ddd !important;
-      user-select: none !important;
-    }
-
-    .d2h-code-side-line {
-      position: relative !important;
-      display: block !important;  
-      padding-left: 50px !important;
-    }
-
-    .d2h-code-line {
-      position: relative !important;
-      display: block !important;
-      padding-left: 50px !important;
-    }
-
-    .d2h-code-line-ctn, 
-    .d2h-code-side-line-ctn {
-      position: relative !important;
-      display: block !important;
-      width: 100% !important;
-      padding: 0 8px !important;
-      white-space: pre-wrap !important;
-      word-wrap: break-word !important;
-      word-break: break-all !important;
+    
+    /* 删除不必要的边框和背景 */
+    .d2h-file-wrapper {
+      border: none;
+      margin-bottom: 0;
     }
     
+    .d2h-file-diff {
+      overflow-x: auto;
+    }
+    
+    /* 表格布局修复 */
+    .d2h-diff-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    /* 行内视图样式 */
+    .d2h-code-line {
+      display: flex;
+      white-space: pre-wrap;
+    }
+    
+    .d2h-code-linenumber {
+      width: 40px;
+      min-width: 40px;
+      box-sizing: border-box;
+      padding: 0 10px;
+      background-color: #f7f7f7;
+      text-align: right;
+      border-right: 1px solid #ddd;
+      cursor: pointer;
+      user-select: none;
+      color: #999;
+      font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    }
+    
+    .d2h-code-line-ctn {
+      padding: 0 10px;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    
+    /* 左右视图样式 */
+    .d2h-code-side-line {
+      display: flex;
+      white-space: pre-wrap;
+    }
+    
+    .d2h-code-side-linenumber {
+      width: 40px;
+      min-width: 40px;
+      box-sizing: border-box;
+      padding: 0 10px;
+      background-color: #f7f7f7;
+      text-align: right;
+      border-right: 1px solid #ddd;
+      cursor: pointer;
+      user-select: none;
+      color: #999;
+      font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    }
+    
+    .d2h-code-side-line-ctn {
+      padding: 0 10px;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    
+    /* 颜色覆盖 */
+    .d2h-code-line-ins {
+      background-color: #e6ffec;
+    }
+    
+    .d2h-code-line-del {
+      background-color: #ffebe9;
+    }
+    
+    .d2h-code-side-line-ins {
+      background-color: #e6ffec;
+    }
+    
+    .d2h-code-side-line-del {
+      background-color: #ffebe9;
+    }
+    
+    .d2h-ins {
+      background-color: #acf2bd;
+    }
+    
+    .d2h-del {
+      background-color: #fdb8c0;
+    }
+    
+    /* 左右分栏布局修复 */
+    .d2h-files-diff {
+      width: 100%;
+      display: block;
+    }
+    
+    /* 确保左右视图真正并排 */
+    .d2h-file-side-diff {
+      display: inline-block !important;
+      float: left !important;
+      overflow-x: auto;
+      width: 49.5% !important;
+      box-sizing: border-box !important;
+      margin: 0 !important;
+      vertical-align: top !important;
+    }
+    
+    /* 添加边框分隔 */
+    .d2h-file-side-diff:first-child {
+      border-right: 1px solid #ddd;
+      margin-right: 0.5% !important;
+    }
+    
+    /* 修复内容容器 */
+    .d2h-file-wrapper {
+      margin-bottom: 0 !important;
+    }
+    
+    /* 清除浮动 */
+    .d2h-files-diff:after {
+      content: "";
+      display: table;
+      clear: both;
+    }
+    
+    /* 确保表头行对齐 */
+    .d2h-diff-thead > tr > th {
+      text-align: left !important;
+    }
+    
+    /* 确保单元格没有额外的外边距 */
+    .d2h-diff-tbody > tr > td {
+      height: auto !important;
+      padding: 0 !important;
+      border: none !important;
+    }
+    
+    /* 间距和白边调整 */
+    td.d2h-info {
+      background-color: #f8fafd;
+      color: rgba(0, 0, 0, 0.3);
+      border-color: #edf2f9;
+    }
+    
+    .d2h-code-line td, 
+    .d2h-code-side-line td {
+      padding: 2px 5px;
+    }
+
     /* 加载动画 */
     .loading-container {
       display: flex;
@@ -187,6 +283,14 @@
       padding: 50px;
       color: #d32f2f;
     }
+    
+    /* 移动视图调整 */
+    @media screen and (max-width: 768px) {
+      .d2h-file-side-diff {
+        width: 100%;
+        float: none;
+      }
+    }
   </style>
   <!-- 加载脚本，但先不执行我们的脚本 -->
   <script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
@@ -204,8 +308,8 @@
         <div class="diff-control-group">
           <span class="diff-control-label">显示方式:</span>
           <select id="outputFormat" class="diff-control-select">
-            <option value="side-by-side">左右对比</option>
             <option value="line-by-line">行内对比</option>
+            <option value="side-by-side">左右对比</option>
           </select>
         </div>
         <div class="diff-control-group">
@@ -234,8 +338,6 @@
       <div class="diff-section-header">响应信息</div>
       <!-- 在JavaScript中填充差异内容 -->
     </div>
-
-    <button class="return-button" id="closeButton">关闭窗口</button>
   </div>
 </body>
 </html> 

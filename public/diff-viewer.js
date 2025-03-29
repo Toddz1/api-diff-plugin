@@ -274,11 +274,49 @@ function createDiffItem(title, oldValue, newValue, filename, options) {
       throw new Error('Diff2Html 库未找到 - 请确保库已正确加载');
     }
     
+    // 处理JSON格式化
+    if (filename.endsWith('.json')) {
+      try {
+        // 尝试将字符串解析为JSON并格式化
+        if (typeof oldValue === 'string' && oldValue.trim()) {
+          const parsed = JSON.parse(oldValue);
+          oldValue = JSON.stringify(parsed, null, 2);
+        }
+        if (typeof newValue === 'string' && newValue.trim()) {
+          const parsed = JSON.parse(newValue);
+          newValue = JSON.stringify(parsed, null, 2);
+        }
+      } catch (e) {
+        console.warn('无法解析JSON进行格式化，将使用原始字符串:', e);
+      }
+    }
+    
+    // 确保值为字符串
+    oldValue = oldValue || '';
+    newValue = newValue || '';
+    
     // 创建差异补丁
-    const diffStr = window.Diff.createPatch(filename, oldValue || '', newValue || '', '原始内容', '修改后内容');
+    const diffStr = window.Diff.createPatch(
+      filename, 
+      typeof oldValue !== 'string' ? JSON.stringify(oldValue, null, 2) : oldValue, 
+      typeof newValue !== 'string' ? JSON.stringify(newValue, null, 2) : newValue, 
+      '原始内容', 
+      '修改后内容'
+    );
+    
+    // 配置对象
+    const config = {
+      ...options,
+      drawFileList: false,
+      matching: 'lines',
+      outputFormat: options.outputFormat,
+      renderNothingWhenEmpty: false,
+      matchingMaxComparisons: 2500,
+      maxLineSizeInBlockForComparison: 200
+    };
     
     // 生成HTML
-    const diffHtml = window.Diff2Html.html(diffStr, options);
+    const diffHtml = window.Diff2Html.html(diffStr, config);
     
     // 返回HTML结构
     return `
@@ -295,13 +333,6 @@ function createDiffItem(title, oldValue, newValue, filename, options) {
         <div class="diff-content">
           <div style="padding: 20px; color: #d32f2f;">
             无法生成差异视图: ${error.message}
-            <br>
-            <details>
-              <summary>技术细节</summary>
-              <div>
-                <pre>Error: ${error.message}\n${error.stack || '没有调用栈信息'}</pre>
-              </div>
-            </details>
           </div>
         </div>
       </div>
@@ -311,33 +342,42 @@ function createDiffItem(title, oldValue, newValue, filename, options) {
 
 // 获取当前差异选项
 function getCurrentDiffOptions() {
-  const outputFormat = document.getElementById('outputFormat')?.value || 'side-by-side';
+  const outputFormat = document.getElementById('outputFormat')?.value || 'line-by-line';
   const diffStyle = document.getElementById('diffStyle')?.value || 'word';
   
   console.log(`Current diff options: outputFormat=${outputFormat}, diffStyle=${diffStyle}`);
   
-  return {
+  const baseOptions = {
     drawFileList: false,
     matching: 'lines',
     outputFormat: outputFormat,
     renderNothingWhenEmpty: false,
     matchingMaxComparisons: 2500,
     maxLineSizeInBlockForComparison: 200,
-    diffStyle: diffStyle
+    diffStyle: diffStyle,
+    lineNumbers: true,
+    colorScheme: {
+      addedBackground: '#e6ffed',
+      addedColor: '#24292e',
+      removedBackground: '#ffebe9',
+      removedColor: '#24292e',
+      unchangedBackground: '#ffffff',
+      unchangedColor: '#24292e'
+    }
   };
+  
+  // 为左右对比模式添加额外配置
+  if (outputFormat === 'side-by-side') {
+    baseOptions.synchronisedScroll = true; // 同步滚动
+    baseOptions.renderNothingWhenEmpty = true; // 不显示空行  
+  }
+  
+  return baseOptions;
 }
 
 // 设置事件监听器
 function setupEventListeners(data) {
   console.log('Setting up event listeners');
-  // 关闭按钮事件
-  const closeButton = document.getElementById('closeButton');
-  if (closeButton) {
-    closeButton.addEventListener('click', () => window.close());
-    console.log('Close button listener added');
-  } else {
-    console.error('Close button not found');
-  }
   
   // 样式变更事件
   const outputFormatSelect = document.getElementById('outputFormat');
