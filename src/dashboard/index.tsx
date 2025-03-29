@@ -256,7 +256,7 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
     <div className="modal">
       <div className="modal-content">
         <div className="modal-header">
-          <h2>比较和修改请求</h2>
+          <h2>Compare and Modify Request</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         
@@ -316,7 +316,7 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
           {error && <div className="error-message">{error}</div>}
 
           <div className="diff-preview">
-            <h3>变更预览</h3>
+            <h3>Changes Preview</h3>
             <div className="diff-section">
               {Object.entries(modifiedRequest).map(([key, value]) => {
                 const originalValue = request[key as keyof RequestData];
@@ -326,11 +326,11 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
                       <h4>{key}</h4>
                       <div className="diff-content">
                         <div className="original">
-                          <strong>原始值:</strong>
+                          <strong>Original:</strong>
                           <pre>{JSON.stringify(originalValue, null, 2)}</pre>
                         </div>
                         <div className="modified">
-                          <strong>修改后:</strong>
+                          <strong>Modified:</strong>
                           <pre>{JSON.stringify(value, null, 2)}</pre>
                         </div>
                       </div>
@@ -351,7 +351,7 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
                 checked={shouldSaveRequest}
                 onChange={e => setShouldSaveRequest(e.target.checked)}
               />
-              保存为新请求记录
+              Save as new request record
             </label>
           </div>
           <div className="buttons">
@@ -360,14 +360,14 @@ const DiffModal: React.FC<DiffModalProps> = ({ request, onClose, onSendRequest }
               onClick={onClose}
               disabled={isLoading}
             >
-              取消
+              Cancel
             </button>
             <button 
               className="apply-button" 
               onClick={handleSubmit}
               disabled={isLoading}
             >
-              {isLoading ? '处理中...' : '请求'}
+              {isLoading ? 'Processing...' : 'Send'}
             </button>
           </div>
         </div>
@@ -387,12 +387,12 @@ const SourceModal: React.FC<SourceModalProps> = ({ request, onClose }) => {
     <div className="modal">
       <div className="modal-content large-modal">
         <div className="modal-header">
-          <h2>完整请求/响应信息</h2>
+          <h2>Complete Request/Response Information</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
           <div className="source-section">
-            <h3>请求信息</h3>
+            <h3>Request Information</h3>
             <div className="source-item">
               <div className="source-label">URL:</div>
               <div className="source-value">{request.url}</div>
@@ -432,7 +432,7 @@ const SourceModal: React.FC<SourceModalProps> = ({ request, onClose }) => {
           </div>
           
           <div className="source-section">
-            <h3>响应信息</h3>
+            <h3>Response Information</h3>
             {request.response ? (
               <>
                 <div className="source-item">
@@ -602,7 +602,7 @@ const RequestItem: React.FC<{
                 console.error('Failed to copy curl command:', err);
               });
             }}
-            title="导出为curl命令"
+            title="Export as curl command"
           >
             Curl
           </button>
@@ -612,7 +612,7 @@ const RequestItem: React.FC<{
               e.stopPropagation();
               setShowSourceModal(true);
             }}
-            title="查看完整请求/响应信息"
+            title="View Complete Request/Response Information"
           >
             Source
           </button>
@@ -622,7 +622,7 @@ const RequestItem: React.FC<{
               e.stopPropagation();
               setShowDiffModal(true);
             }}
-            title="比较和修改请求"
+            title="Compare and Modify Request"
           >
             Diff
           </button>
@@ -718,11 +718,11 @@ const DiffResultModal: React.FC<DiffResultModalProps> = ({ originalRequest, newR
         <h3>{title}</h3>
         <div className="diff-content">
           <div className="diff-original">
-            <h4>原始值</h4>
+            <h4>Original:</h4>
             <pre>{oldStr}</pre>
           </div>
           <div className="diff-modified">
-            <h4>修改后</h4>
+            <h4>Modified:</h4>
             <pre>{newStr}</pre>
           </div>
         </div>
@@ -734,12 +734,12 @@ const DiffResultModal: React.FC<DiffResultModalProps> = ({ originalRequest, newR
     <div className="modal diff-result-modal">
       <div className="modal-content large-modal">
         <div className="modal-header">
-          <h2>请求对比结果</h2>
+          <h2>Request Comparison Result</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
           <div className="diff-section">
-            <h3>请求变更</h3>
+            <h3>Request Changes</h3>
             {diffData.requestDiff.url && renderDiff(
               diffData.requestDiff.url.old,
               diffData.requestDiff.url.new,
@@ -763,7 +763,7 @@ const DiffResultModal: React.FC<DiffResultModalProps> = ({ originalRequest, newR
           </div>
           
           <div className="diff-section">
-            <h3>响应变更</h3>
+            <h3>Response Changes</h3>
             {diffData.responseDiff.status && renderDiff(
               diffData.responseDiff.status.old,
               diffData.responseDiff.status.new,
@@ -800,7 +800,7 @@ const RenameSessionModal: React.FC<RenameSessionModalProps> = ({ session, onSave
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      setError('名称不能为空');
+      setError('Name cannot be empty');
       return;
     }
 
@@ -810,7 +810,7 @@ const RenameSessionModal: React.FC<RenameSessionModalProps> = ({ session, onSave
       await onSave(session.id, name);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '重命名失败');
+      setError(err instanceof Error ? err.message : 'Failed to rename session');
     } finally {
       setIsLoading(false);
     }
@@ -820,18 +820,18 @@ const RenameSessionModal: React.FC<RenameSessionModalProps> = ({ session, onSave
     <div className="modal">
       <div className="modal-content">
         <div className="modal-header">
-          <h2>重命名会话</h2>
+          <h2>Rename Session</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         
         <div className="modal-body">
           <div className="form-group">
-            <label>会话名称:</label>
+            <label>Session Name:</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="输入会话名称"
+              placeholder="Enter session name"
             />
           </div>
 
@@ -845,14 +845,14 @@ const RenameSessionModal: React.FC<RenameSessionModalProps> = ({ session, onSave
               onClick={onClose}
               disabled={isLoading}
             >
-              取消
+              Cancel
             </button>
             <button 
               className="apply-button" 
               onClick={handleSubmit}
               disabled={isLoading}
             >
-              {isLoading ? '保存中...' : '保存'}
+              {isLoading ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
@@ -1185,7 +1185,7 @@ const Dashboard: React.FC = () => {
             
             if (!diffWindow) {
               console.error('Failed to open diff window');
-              throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
+              throw new Error('Failed to open diff window, please check if browser is blocking pop-ups');
             }
           } catch (storageError) {
             console.error('Failed to save data to localStorage, falling back to URL params', storageError);
@@ -1204,7 +1204,7 @@ const Dashboard: React.FC = () => {
             
             if (!diffWindow) {
               console.error('Failed to open diff window');
-              throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
+              throw new Error('Failed to open diff window, please check if browser is blocking pop-ups');
             }
           }
         }
@@ -1261,7 +1261,7 @@ const Dashboard: React.FC = () => {
   const handleDeleteSelectedSessions = async () => {
     if (selectedSessions.size === 0) return;
     
-    if (!window.confirm(`确定要删除 ${selectedSessions.size} 个选中的会话吗？`)) {
+    if (!window.confirm(`Are you sure you want to delete ${selectedSessions.size} selected sessions?`)) {
       return;
     }
     
@@ -1297,7 +1297,7 @@ const Dashboard: React.FC = () => {
   const handleDeleteSelectedRequests = async () => {
     if (!selectedSession || selectedRequests.size === 0) return;
     
-    if (!window.confirm(`确定要删除 ${selectedRequests.size} 个选中的请求吗？`)) {
+    if (!window.confirm(`Are you sure you want to delete ${selectedRequests.size} selected requests?`)) {
       return;
     }
     
@@ -1334,7 +1334,7 @@ const Dashboard: React.FC = () => {
 
   // 删除会话
   const handleDeleteSession = async (sessionId: string) => {
-    if (!window.confirm('确定要删除这个会话吗？')) {
+    if (!window.confirm('Are you sure you want to delete this session?')) {
       return;
     }
 
@@ -1364,7 +1364,7 @@ const Dashboard: React.FC = () => {
       // 查找会话
       const session = sessions.find(s => s.id === sessionId);
       if (!session) {
-        throw new Error('会话不存在');
+        throw new Error('Session does not exist');
       }
 
       // 更新会话
@@ -1391,7 +1391,7 @@ const Dashboard: React.FC = () => {
       console.log(`Dashboard: Successfully renamed session ${sessionId} to "${newName}"`);
     } catch (err) {
       console.error('Dashboard: Failed to rename session:', err);
-      setError(`重命名会话失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      setError(`Failed to rename session: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -1411,7 +1411,7 @@ const Dashboard: React.FC = () => {
       const request2 = requests.find(r => r.id === requestIds[1]);
       
       if (!request1 || !request2) {
-        throw new Error('无法找到选中的请求');
+        throw new Error('Failed to find selected requests');
       }
 
       console.log('Comparing requests:', request1.id, request2.id);
@@ -1459,7 +1459,7 @@ const Dashboard: React.FC = () => {
         
         if (!diffWindow) {
           console.error('Failed to open diff window');
-          throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
+          throw new Error('Failed to open diff window, please check if browser is blocking pop-ups');
         }
       } catch (storageError) {
         console.error('Failed to save data to localStorage, falling back to URL params', storageError);
@@ -1478,12 +1478,12 @@ const Dashboard: React.FC = () => {
         
         if (!diffWindow) {
           console.error('Failed to open diff window');
-          throw new Error('无法打开差异窗口，请检查浏览器是否阻止了弹出窗口');
+          throw new Error('Failed to open diff window, please check if browser is blocking pop-ups');
         }
       }
     } catch (error) {
       console.error('Failed to compare requests:', error);
-      setError(`比较请求失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      setError(`Failed to compare requests: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -1605,7 +1605,7 @@ const Dashboard: React.FC = () => {
                 checked={selectedSessions.size > 0 && selectedSessions.size === sessions.length}
                 onChange={(e) => handleSelectAllSessions(e.target.checked)}
               />
-              全选
+              Select All
             </label>
             {selectedSessions.size > 0 && (
               <button 
@@ -1613,7 +1613,7 @@ const Dashboard: React.FC = () => {
                 onClick={handleDeleteSelectedSessions}
                 disabled={isLoading}
               >
-                删除选中 ({selectedSessions.size})
+                Delete Selected ({selectedSessions.size})
               </button>
             )}
           </div>
@@ -1667,7 +1667,7 @@ const Dashboard: React.FC = () => {
                         e.stopPropagation();
                         setRenameSessionId(session.id);
                       }}
-                      title="重命名会话"
+                      title="Rename Session"
                     >
                       ✏️
                     </button>
@@ -1677,7 +1677,7 @@ const Dashboard: React.FC = () => {
                         e.stopPropagation();
                         handleDeleteSession(session.id);
                       }}
-                      title="删除会话"
+                      title="Delete Session"
                     >
                       ×
                     </button>
@@ -1701,7 +1701,7 @@ const Dashboard: React.FC = () => {
                         checked={selectedRequests.size > 0 && selectedRequests.size === requests.length}
                         onChange={(e) => handleSelectAllRequests(e.target.checked)}
                       />
-                      全选
+                      Select All
                     </label>
                     {selectedRequests.size > 0 && (
                       <>
@@ -1710,7 +1710,7 @@ const Dashboard: React.FC = () => {
                           onClick={handleDeleteSelectedRequests}
                           disabled={isLoading}
                         >
-                          删除选中 ({selectedRequests.size})
+                          Delete Selected ({selectedRequests.size})
                         </button>
                         
                         {selectedRequests.size === 2 && (
@@ -1719,7 +1719,7 @@ const Dashboard: React.FC = () => {
                             onClick={handleCompareRequests}
                             disabled={isLoading}
                           >
-                            请求对比
+                            Compare Requests
                           </button>
                         )}
                       </>
