@@ -85,17 +85,32 @@ function renderMetadata(data) {
   }
   
   let metadata = '';
+  const diffDirection = document.getElementById('diffDirection')?.value || 'A-to-B';
   
   if (data.request1Time && data.request2Time) {
-    metadata = `
-      <div>请求1: ${new Date(data.request1Time).toLocaleString()}</div>
-      <div>请求2: ${new Date(data.request2Time).toLocaleString()}</div>
-    `;
+    if (diffDirection === 'A-to-B') {
+      metadata = `
+        <div>请求1 (A): ${new Date(data.request1Time).toLocaleString()}</div>
+        <div>请求2 (B): ${new Date(data.request2Time).toLocaleString()}</div>
+      `;
+    } else {
+      metadata = `
+        <div>请求2 (A): ${new Date(data.request2Time).toLocaleString()}</div>
+        <div>请求1 (B): ${new Date(data.request1Time).toLocaleString()}</div>
+      `;
+    }
   } else if (data.originalTime && data.modifiedTime) {
-    metadata = `
-      <div>原始请求时间: ${new Date(data.originalTime).toLocaleString()}</div>
-      <div>修改后请求时间: ${new Date(data.modifiedTime).toLocaleString()}</div>
-    `;
+    if (diffDirection === 'A-to-B') {
+      metadata = `
+        <div>原始请求时间 (A): ${new Date(data.originalTime).toLocaleString()}</div>
+        <div>修改后请求时间 (B): ${new Date(data.modifiedTime).toLocaleString()}</div>
+      `;
+    } else {
+      metadata = `
+        <div>修改后请求时间 (A): ${new Date(data.modifiedTime).toLocaleString()}</div>
+        <div>原始请求时间 (B): ${new Date(data.originalTime).toLocaleString()}</div>
+      `;
+    }
   }
   
   metadataEl.innerHTML = metadata;
@@ -295,13 +310,24 @@ function createDiffItem(title, oldValue, newValue, filename, options) {
     oldValue = oldValue || '';
     newValue = newValue || '';
     
+    // 根据对比顺序，可能需要交换新旧值
+    const diffDirection = document.getElementById('diffDirection')?.value || 'A-to-B';
+    let fromContent = oldValue;
+    let toContent = newValue;
+    
+    if (diffDirection === 'B-to-A') {
+      // 交换新旧值
+      fromContent = newValue;
+      toContent = oldValue;
+    }
+    
     // 创建差异补丁
     const diffStr = window.Diff.createPatch(
       filename, 
-      typeof oldValue !== 'string' ? JSON.stringify(oldValue, null, 2) : oldValue, 
-      typeof newValue !== 'string' ? JSON.stringify(newValue, null, 2) : newValue, 
-      '原始内容', 
-      '修改后内容'
+      typeof fromContent !== 'string' ? JSON.stringify(fromContent, null, 2) : fromContent, 
+      typeof toContent !== 'string' ? JSON.stringify(toContent, null, 2) : toContent, 
+      diffDirection === 'A-to-B' ? '原始内容' : '修改后内容', 
+      diffDirection === 'A-to-B' ? '修改后内容' : '原始内容'
     );
     
     // 配置对象
@@ -342,7 +368,7 @@ function createDiffItem(title, oldValue, newValue, filename, options) {
 
 // 获取当前差异选项
 function getCurrentDiffOptions() {
-  const outputFormat = document.getElementById('outputFormat')?.value || 'line-by-line';
+  const outputFormat = document.getElementById('outputFormat')?.value || 'side-by-side';
   const diffStyle = document.getElementById('diffStyle')?.value || 'word';
   
   console.log(`Current diff options: outputFormat=${outputFormat}, diffStyle=${diffStyle}`);
@@ -382,8 +408,9 @@ function setupEventListeners(data) {
   // 样式变更事件
   const outputFormatSelect = document.getElementById('outputFormat');
   const diffStyleSelect = document.getElementById('diffStyle');
+  const diffDirectionSelect = document.getElementById('diffDirection');
   
-  if (outputFormatSelect && diffStyleSelect) {
+  if (outputFormatSelect && diffStyleSelect && diffDirectionSelect) {
     outputFormatSelect.addEventListener('change', () => {
       console.log('Output format changed to', outputFormatSelect.value);
       refreshDiffs(data);
@@ -391,6 +418,11 @@ function setupEventListeners(data) {
     
     diffStyleSelect.addEventListener('change', () => {
       console.log('Diff style changed to', diffStyleSelect.value);
+      refreshDiffs(data);
+    });
+    
+    diffDirectionSelect.addEventListener('change', () => {
+      console.log('Diff direction changed to', diffDirectionSelect.value);
       refreshDiffs(data);
     });
     

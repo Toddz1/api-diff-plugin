@@ -308,8 +308,8 @@
         <div class="diff-control-group">
           <span class="diff-control-label">显示方式:</span>
           <select id="outputFormat" class="diff-control-select">
-            <option value="line-by-line">行内对比</option>
             <option value="side-by-side">左右对比</option>
+            <option value="line-by-line">行内对比</option>
           </select>
         </div>
         <div class="diff-control-group">
@@ -318,6 +318,13 @@
             <option value="word">单词</option>
             <option value="char">字符</option>
             <option value="none">行</option>
+          </select>
+        </div>
+        <div class="diff-control-group">
+          <span class="diff-control-label">对比顺序:</span>
+          <select id="diffDirection" class="diff-control-select">
+            <option value="A-to-B">A→B</option>
+            <option value="B-to-A">B→A</option>
           </select>
         </div>
       </div>
